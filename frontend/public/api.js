@@ -7,8 +7,11 @@
 const API = {
   cfg: window.VVT_CONFIG || { source: 'mock', apiBase: '' },
   get server() { return this.cfg.source === 'server'; },
+  token() { try { return JSON.parse(localStorage.getItem('vvt.token') || 'null') || ''; } catch (e) { return ''; } },
+  headers() { const h = { Accept: 'application/json' }; const t = this.token(); if (t) h.Authorization = 'Bearer ' + t; return h; },
   async get(path) {
-    const r = await fetch(this.cfg.apiBase + path, { headers: { Accept: 'application/json' } });
+    const r = await fetch(this.cfg.apiBase + path, { headers: this.headers() });
+    if (r.status === 401) { try { localStorage.removeItem('vvt.auth'); } catch (e) {} if (typeof renderLogin === 'function') renderLogin(); throw new Error('Sign in with your API token'); }
     if (!r.ok) { let d = ''; try { d = (await r.json()).detail || ''; } catch (e) {} throw new Error(`${r.status} ${path} ${d}`); }
     return r.json();
   },

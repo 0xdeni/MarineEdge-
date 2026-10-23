@@ -19,6 +19,7 @@ sts:
   max_dist_m: 500            # another vessel within this distance
   max_speed_kn: 1.0          # both slower than this
   min_hours: 2               # for at least this long, outside port limits
+  max_lookups_per_vessel: 12 # cap on paid 'vessels near' queries per vessel per run (each one costs credits)
 
 position_jump:
   max_implied_kn: 30         # implied speed between two consecutive fixes above this

@@ -1,0 +1,21 @@
+# MarineEdge · reverse proxy with automatic HTTPS (Let's Encrypt).
+# Replace tracker.example.com with your domain (DNS A record → the server) before `docker compose --profile prod up`.
+tracker.example.com {
+  encode zstd gzip
+  # API → FastAPI container
+  handle /api/* {
+    reverse_proxy api:8000
+  }
+  # PWA → nginx container
+  handle {
+    reverse_proxy web:80
+  }
+  header {
+    Strict-Transport-Security "max-age=31536000; includeSubDomains"
+    X-Content-Type-Options nosniff
+    Referrer-Policy strict-origin-when-cross-origin
+  }
+  log {
+    output file /data/access.log
+  }
+}

@@ -501,11 +501,11 @@ function renderLogin() {
   const el = $('#login'); el.hidden = false;
   el.innerHTML = `<form class="lcard glass" id="loginForm"><div class="wm"><span class="wmark">${ICON.logo}</span><div><h1>MarineEdge</h1><p>Vessel due diligence · Black Sea &amp; Gulf</p></div></div>
   <div class="field"><label for="lemail">Work email</label><input id="lemail" type="email" autocomplete="username" placeholder="you@company.com" required value="${esc(store.get('lastEmail', ''))}"></div>
-  <div class="field"><label for="lpass">Password</label><input id="lpass" type="password" autocomplete="current-password" placeholder="••••••••" required></div>
+  <div class="field"><label for="lpass">${API.server ? 'API token' : 'Password'}</label><input id="lpass" type="password" autocomplete="current-password" placeholder="••••••••" required></div>
   <button class="cap primary" type="submit">Sign in</button><button class="cap tint" type="button" data-act="passkey">Continue with a passkey</button>
   <div class="linkrow"><button type="button" data-act="forgot">Forgot password</button><button type="button" data-act="sso">Company SSO</button></div>
-  <p style="font-size:12px">Demo sign-in: any email and password work. Production uses your identity provider; sessions never leave your server.</p></form>`;
-  el.querySelector('#loginForm').addEventListener('submit', e => { e.preventDefault(); const email = $('#lemail').value.trim() || 'analyst@example.com'; signIn(email); });
+  <p style="font-size:12px">${API.server ? 'Enter the API token from your administrator. SSO replaces this on the company deployment.' : 'Demo sign-in: any email and password work. Production uses your identity provider; sessions never leave your server.'}</p></form>`;
+  el.querySelector('#loginForm').addEventListener('submit', e => { e.preventDefault(); const email = $('#lemail').value.trim() || 'analyst@example.com'; if (API.server) store.set('token', $('#lpass').value.trim()); signIn(email); if (API.server && !LIVE.length) loadFleet(() => { updateBadge(); renderSheet(); }); });
   el.addEventListener('click', e => { const b = e.target.closest('[data-act]'); if (!b) return; if (b.dataset.act === 'passkey') signIn($('#lemail').value.trim() || 'analyst@example.com'); if (b.dataset.act === 'forgot') toast('Reset link would be emailed in production'); if (b.dataset.act === 'sso') toast('SSO redirect happens in production'); });
 }
 function signIn(email) {
@@ -514,7 +514,7 @@ function signIn(email) {
   const u = Object.assign({ org: email.split('@')[1] ? email.split('@')[1].split('.')[0].replace(/^\w/, c => c.toUpperCase()) : 'Your organisation', role: 'Analyst' }, prev, { email, name: prev.name || name });
   store.set('user', u); store.set('auth', { t: NOW }); store.set('lastEmail', email); $('#login').hidden = true; toast(`Signed in as ${u.name}`); if (S.page === 'profile') renderPage('profile');
 }
-function signOut() { store.del('auth'); S.pview = 'root'; renderLogin(); }
+function signOut() { store.del('auth'); store.del('token'); S.pview = 'root'; renderLogin(); }
 
 /* ------------------------------------- report ------------------------------------- */
 function reportText(a) {
@@ -576,7 +576,7 @@ function wireUI() {
     else if (act === 'flag') { const f = ANALYSIS.get(S.imo).flags.find(f => f.id === b.dataset.id); if (f) focusFlag(f, false, 'peek'); }
     else if (act === 'fit') { Sheet.snap('peek'); Chart.fitBounds(boundsOf(ANALYSIS.get(S.imo).track)); }
     else if (act === 'watch') { toggleWatch(S.imo); renderSheet(); updateBadge(); }
-    else if (act === 'report') { if (API.server) window.open(API.reportUrl(S.imo), '_blank'); else openReport(); }
+    else if (act === 'report') { if (API.server) { toast('Generating PDF…'); fetch(API.reportUrl(S.imo), { method: 'POST', headers: API.headers() }).then(r => { if (!r.ok) throw new Error(r.status); return r.blob(); }).then(b => { const u = URL.createObjectURL(b); const a = document.createElement('a'); a.href = u; a.download = `marineedge-${S.imo}.pdf`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 10000); }).catch(err => toast('Report failed: ' + err.message)); } else openReport(); }
   });
   $('#sheetBody').addEventListener('input', e => { if (e.target.id === 'note') { const n = store.get('notes', {}); n[S.imo + '-' + S.voyage] = e.target.value; store.set('notes', n); } });
   $('#report').addEventListener('click', e => { const b = e.target.closest('[data-act]'); if (!b) return; if (b.dataset.act === 'closereport') { $('#report').hidden = true; if (S.page === 'reports') renderPage('reports'); } if (b.dataset.act === 'copyreport') copyReport(); });

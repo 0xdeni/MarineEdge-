@@ -127,7 +127,11 @@ def rule_sts(c: Ctx) -> list[Flag]:
         return out
     n = len(c.track)
     i = 0
+    lookups = 0
+    cap = int(r.get("max_lookups_per_vessel", 12) or 0)
     while i < n:
+        if cap and lookups >= cap:
+            break
         if c.track[i].sog < r.max_speed_kn and not c.in_port[i]:
             j = i
             while j + 1 < n and c.track[j + 1].sog < r.max_speed_kn and not c.in_port[j + 1] and c.track[j + 1].t - c.track[j].t < 6 * H:
@@ -135,6 +139,7 @@ def rule_sts(c: Ctx) -> list[Flag]:
             t0, t1 = c.track[i].t, c.track[j].t
             if t1 - t0 >= r.min_hours * H:
                 mid = c.track[(i + j) // 2]
+                lookups += 1
                 for other, n0, n1 in c.vessels_near(mid.lat, mid.lon, r.max_dist_m, t0, t1):
                     if other.imo == c.vessel.imo or n1 - n0 < r.min_hours * H:
                         continue

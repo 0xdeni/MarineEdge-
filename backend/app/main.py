@@ -6,16 +6,17 @@ import logging
 import os
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 
+from app.auth import enabled as auth_enabled, require_token
 from app.providers.base import CreditsExhausted, ProviderError
 from app.service import Service, analysis_json, vessel_json
 
 logging.basicConfig(level=os.environ.get("LOG_LEVEL", "INFO"))
-app = FastAPI(title="MarineEdge API", version="0.2.0")
+app = FastAPI(title="MarineEdge API", version="0.3.0", dependencies=[Depends(require_token)])
 app.add_middleware(CORSMiddleware, allow_origins=os.environ.get("CORS_ORIGINS", "*").split(","), allow_methods=["*"], allow_headers=["*"])
 svc = Service()
 
@@ -37,7 +38,7 @@ async def _provider(_, exc):
 
 @app.get("/api/health")
 def health():
-    return {"ok": True, "provider": getattr(svc.provider, "name", "?"), "rules": dict(svc.rules), "zones": [{"id": z.id, "name": z.name, "enabled": z.enabled} for z in svc.ref.zones]}
+    return {"ok": True, "provider": getattr(svc.provider, "name", "?"), "auth": "token" if auth_enabled() else "open", "rules": dict(svc.rules), "zones": [{"id": z.id, "name": z.name, "enabled": z.enabled} for z in svc.ref.zones]}
 
 
 @app.get("/api/vessels/search")

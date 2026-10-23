@@ -15,4 +15,10 @@ services:
     build: { context: ., dockerfile: frontend/Dockerfile }
     depends_on: [ api ]
     ports: [ "8080:80" ]
-volumes: { pgdata: {}, reports: {} }
+  caddy:
+    image: caddy:2.8-alpine
+    profiles: [ prod ]
+    ports: [ "80:80", "443:443" ]
+    volumes: [ "./deploy/Caddyfile:/etc/caddy/Caddyfile:ro", "caddy_data:/data", "caddy_config:/config" ]
+    depends_on: [ web, api ]
+volumes: { pgdata: {}, reports: {}, caddy_data: {}, caddy_config: {} }

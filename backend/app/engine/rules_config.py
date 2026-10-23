@@ -16,7 +16,7 @@ DEFAULTS: dict[str, Any] = {
     "port_call": {"max_speed_kn": 0.5, "min_hours": 6, "port_radius_nm": 5, "merge_within_hours": 36},
     "ais_gap": {"min_hours": 6, "high_hours": 24, "near_sensitive_nm": 100},
     "draught_change": {"min_meters": 1.0},
-    "sts": {"max_dist_m": 500, "max_speed_kn": 1.0, "min_hours": 2},
+    "sts": {"max_dist_m": 500, "max_speed_kn": 1.0, "min_hours": 2, "max_lookups_per_vessel": 12},
     "position_jump": {"max_implied_kn": 30},
     "identity": {"medium_if_more_than": 1},
     "sanctions": {"lookback_months": 12, "lists": ["OFAC SDN", "EU", "UK"]},

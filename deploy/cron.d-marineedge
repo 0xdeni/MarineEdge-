@@ -1,0 +1,3 @@
+# /etc/cron.d/marineedge
+0 3 * * * root /opt/marineedge/deploy/backup.sh >> /var/log/marineedge-backup.log 2>&1
+30 4 * * * root cd /opt/marineedge && docker compose exec -T api python -m app.cli sanctions-refresh >> /var/log/marineedge-sanctions.log 2>&1

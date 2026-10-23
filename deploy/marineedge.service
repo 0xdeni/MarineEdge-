@@ -1,0 +1,15 @@
+[Unit]
+Description=MarineEdge (docker compose)
+Requires=docker.service
+After=docker.service network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=true
+WorkingDirectory=/opt/marineedge
+ExecStart=/usr/bin/docker compose --profile prod up -d
+ExecStop=/usr/bin/docker compose --profile prod down
+TimeoutStartSec=0
+
+[Install]
+WantedBy=multi-user.target
