@@ -24,7 +24,17 @@ Full stack with PostGIS: `cp .env.example .env && docker compose up --build`, th
 cd backend && pytest -q          # or: python -m tests.run
 ```
 
-19 engine tests on synthetic tracks: clean, port calls, anchorage merge, voyages, and each of the seven rules (positive and negative cases).
+23 tests: 19 on synthetic tracks (clean, port calls, anchorage merge, voyages, each of the seven rules with positive and negative cases) and 4 on sanctions-list fixtures (OFAC, EU, UK, OpenSanctions).
+
+## Command line
+
+```bash
+cd backend
+python -m app.cli search hormuz            # candidates with IMO
+python -m app.cli pull 9000036             # fetch (cached) + analyse, prints stats and flags
+python -m app.cli report 9000036           # PDF
+python -m app.cli first-pull 9000036 …     # acceptance checks on real IMOs once a key is in .env
+```
 
 ## Switching to a real AIS provider
 
@@ -42,6 +52,10 @@ Put the key in `.env`, set `VVT_PROVIDER=datalastic` (or `kpler` once the adapte
 | `POST /api/vessels/{imo}/report?fmt=pdf` | PDF report |
 | `GET /api/rules` · `POST /api/rules/reload` | thresholds from `config/rules.yaml` |
 | `POST /api/zones/{id}` `{enabled}` | toggle a sensitive zone |
+
+## Deploy
+
+`docs/DEPLOY.md`: one VPS, Docker Compose with Caddy for HTTPS, nightly backups, sanctions cron. Set `API_TOKENS` in `.env` to protect the API.
 
 ## Layout
 

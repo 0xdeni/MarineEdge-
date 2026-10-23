@@ -18,14 +18,16 @@ backend/app/engine      clean → port calls → voyages → rules → pipeline 
 backend/app/providers   base (Protocol), mock (generated fleet), datalastic, kpler (stub)
 backend/app/store.py    MemoryStore | PostgresStore (PostGIS), fetch_log for the cache rule
 backend/app/service.py  orchestration + JSON shapes
-backend/app/main.py     FastAPI routes
+backend/app/main.py     FastAPI routes (token auth via app/auth.py when API_TOKENS is set)
+backend/app/cli.py      search · pull · report · region · fleet · first-pull · sanctions-refresh
 backend/app/sanctions   OFAC/EU/UK loaders → sanctions table
 backend/app/reports     Jinja2 report → Playwright PDF
 backend/migrations      001_init.sql (PostGIS schema)
-backend/tests           synth.py + test_engine.py (19 tests)
-frontend/public         index.html, styles.css, core.js (engine+mock), app.js (screens), api.js, sw.js, manifest
+backend/tests           synth.py + test_engine.py + test_sanctions.py (23 tests)
+frontend/public         index.html, styles.css, core.js (engine+mock), base.js (MapLibre), app.js (screens), api.js, sw.js, manifest
 config/                 rules.yaml, zones.geojson, ports.csv, areas.json
-docs/                   BRIEF.md, STATUS.md, PROVIDERS.md, ARCHITECTURE.md
+docs/                   BRIEF.md, STATUS.md, PROVIDERS.md, ARCHITECTURE.md, DEPLOY.md, OWNER-CHECKLIST.md
+deploy/                 Caddyfile, systemd unit, backup/restore, cron
 ```
 
 ## Commands
