@@ -313,3 +313,45 @@ canvas#map{position:absolute;inset:0;width:100%;height:100%;touch-action:none;di
 
 /* inline text button (cross-check rows) */
 .lnk{background:none;border:0;padding:0 2px;color:var(--accent);font:inherit;font-weight:600;cursor:pointer}
+
+/* ---- Liquid Glass refinements: a lit lens edge that reads as thickness, not a flat border ---- */
+.glass::before{content:"";position:absolute;inset:0;border-radius:inherit;padding:1px;pointer-events:none;z-index:2;
+  background:linear-gradient(165deg,rgba(255,255,255,.92) 0%,rgba(255,255,255,.28) 22%,rgba(255,255,255,.06) 48%,rgba(255,255,255,.04) 70%,rgba(255,255,255,.38) 100%);
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);mask-composite:exclude}
+:root[data-theme="dark"] .glass::before{opacity:.55}
+@media (prefers-color-scheme:dark){ :root:not([data-theme="light"]) .glass::before{opacity:.55} }
+.glass{-webkit-backdrop-filter:blur(28px) saturate(190%) contrast(1.02);backdrop-filter:blur(28px) saturate(190%) contrast(1.02)}
+.sheet.glass{box-shadow:inset 0 1px 0 var(--glass-hi),inset 0 -1px 0 var(--glass-edge),0 -2px 0 rgba(255,255,255,.04),0 18px 50px -20px rgba(0,0,0,.45)}
+
+/* press feedback: everything tappable settles under the finger */
+.cap,.tab,.rchip,.grow,.vrow,.ibtn,.zoom button,.seg button,.lcard .cap{transition:transform .14s cubic-bezier(.2,.8,.2,1),background-color .18s,opacity .18s}
+.cap:active,.rchip:active,.vrow:active,.grow:active,.zoom button:active,.lcard .cap:active{transform:scale(.965)}
+.tab:active{transform:scale(.92)}
+
+/* iOS-26-style tab bar: shrinks to icons while you read, grows back when you scroll up or stop */
+.tabbar{transition:transform .3s cubic-bezier(.2,.8,.2,1),opacity .2s,width .3s cubic-bezier(.2,.8,.2,1),height .3s cubic-bezier(.2,.8,.2,1)}
+.tabbar.mini{height:46px;width:min(calc(100% - 120px),280px);padding:4px}
+.tabbar.mini .tab{height:38px;width:46px;gap:0}
+.tabbar.mini .tab span{display:none}
+.tabbar.mini .tab svg{width:22px;height:22px}
+.tabbar.mini .tab .bdg{top:2px;right:6px}
+
+/* sign-in: a quiet sonar sweep and chart grid behind the card, nothing a template would ship */
+.login{overflow:hidden;background:
+  linear-gradient(color-mix(in srgb,var(--bg) 55%,transparent),color-mix(in srgb,var(--bg) 55%,transparent)),
+  repeating-linear-gradient(0deg,transparent 0 39px,color-mix(in srgb,var(--fg) 7%,transparent) 39px 40px),
+  repeating-linear-gradient(90deg,transparent 0 39px,color-mix(in srgb,var(--fg) 7%,transparent) 39px 40px),var(--bg)}
+.login::before,.login::after{content:"";position:absolute;left:50%;top:50%;width:140vmax;height:140vmax;border-radius:50%;transform:translate(-50%,-50%) scale(0);
+  border:1.5px solid color-mix(in srgb,var(--accent) 45%,transparent);pointer-events:none;animation:sonar 6s cubic-bezier(.2,.6,.3,1) infinite}
+.login::after{animation-delay:3s}
+@keyframes sonar{0%{transform:translate(-50%,-50%) scale(0);opacity:.9}100%{transform:translate(-50%,-50%) scale(1);opacity:0}}
+.lcard{position:relative;z-index:1}
+.lcard .wm p{letter-spacing:.01em}
+.wmark{box-shadow:0 10px 24px -10px color-mix(in srgb,var(--fg) 60%,transparent)}
+
+/* empty states: a line-art mark above the copy, consistent everywhere */
+.empty{display:flex;flex-direction:column;align-items:center;gap:8px;padding:30px 14px 26px}
+.empty svg{width:40px;height:40px;color:var(--fg3);stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.empty b{display:block;color:var(--fg);font-weight:600;font-size:15px}
+.empty .cta{margin-top:4px}
+@media (prefers-reduced-motion:reduce){ .login::before,.login::after{animation:none;display:none} .cap,.tab,.rchip,.grow,.vrow,.ibtn{transition:none} }

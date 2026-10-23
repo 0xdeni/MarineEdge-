@@ -83,11 +83,27 @@ const Chart = {
     if (view === this && Base.active) this.scale = Base.pxPerDegLon();
     ctx.setTransform(view.dpr, 0, 0, view.dpr, 0, 0);
     if (tiles) ctx.clearRect(0, 0, view.w, view.h); else { ctx.fillStyle = T.water; ctx.fillRect(0, 0, view.w, view.h); }
+    this._bottom = this.visibleBottom(ctx, view); this.labelReset();
     if (!tiles) this.drawLand(ctx, view, T);
     if (SET.graticule && !tiles) this.drawGraticule(ctx, view, T, false);
     this.drawZones(ctx, view, T);
     if (S.mode === 'vessel' || S.mode === 'voyage') this.drawVessel(ctx, view, T); else this.drawFleet(ctx, view, T);
     if (ctx === this.ctx) this.updateReadout();
+  },
+  // Overlay hygiene: nothing is labelled under the sheet, and labels never overlap each other.
+  visibleBottom(ctx, view) {
+    if (ctx !== this.ctx) return view.h;
+    const sh = document.getElementById('sheet'); if (!sh || sh.hidden) return view.h;
+    const top = sh.getBoundingClientRect().top - ctx.canvas.getBoundingClientRect().top;
+    return Math.max(120, Math.min(view.h, top));
+  },
+  labelReset() { this._labels = []; },
+  label(ctx, text, x, y, align = 'left', pad = 3) {
+    const w = ctx.measureText(text).width, h = 12; const lx = align === 'left' ? x : align === 'right' ? x - w : x - w / 2;
+    const r = { x0: lx - pad, y0: y - h / 2 - pad, x1: lx + w + pad, y1: y + h / 2 + pad };
+    if (y > (this._bottom ?? 1e9) - 6) return false;
+    for (const o of this._labels || []) if (r.x0 < o.x1 && r.x1 > o.x0 && r.y0 < o.y1 && r.y1 > o.y0) return false;
+    (this._labels || (this._labels = [])).push(r); ctx.textAlign = align; ctx.textBaseline = 'middle'; ctx.fillText(text, x, y); return true;
   },
   drawGraticule(ctx, view, T, linesOnly) {
     const b = view.bounds(); const step = view.scale > 400 ? 0.5 : view.scale > 150 ? 1 : view.scale > 50 ? 2 : 5;
@@ -97,10 +113,12 @@ const Chart = {
       for (let lat = Math.ceil(b[1] / step) * step; lat <= b[3]; lat += step) { const y = view.px(0, mY(lat))[1]; ctx.moveTo(0, y); ctx.lineTo(view.w, y); }
       ctx.stroke(); return;
     }
+    const bottom = this._bottom ?? view.h;
     ctx.fillStyle = T.label; ctx.font = '10px ui-monospace, "IBM Plex Mono", monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-    for (let lon = Math.ceil(b[0] / step) * step; lon <= b[2]; lon += step) { const x = view.px(lon, 0)[0]; if (x > 40 && x < view.w - 40) ctx.fillText(`${Math.abs(lon)}°${lon >= 0 ? 'E' : 'W'}`, x, view.h - 16); }
+    const ly = Math.min(view.h - 16, bottom - 16);
+    for (let lon = Math.ceil(b[0] / step) * step; lon <= b[2]; lon += step) { const x = view.px(lon, 0)[0]; if (x > 40 && x < view.w - 70) ctx.fillText(`${Math.abs(lon)}°${lon >= 0 ? 'E' : 'W'}`, x, ly); }
     ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
-    for (let lat = Math.ceil(b[1] / step) * step; lat <= b[3]; lat += step) { const y = view.px(0, mY(lat))[1]; if (y > 130 && y < view.h - 30) ctx.fillText(`${Math.abs(lat)}°${lat >= 0 ? 'N' : 'S'}`, view.w - 6, y); }
+    for (let lat = Math.ceil(b[1] / step) * step; lat <= b[3]; lat += step) { const y = view.px(0, mY(lat))[1]; if (y > 130 && y < bottom - 30) ctx.fillText(`${Math.abs(lat)}°${lat >= 0 ? 'N' : 'S'}`, view.w - 6, y); }
   },
   drawLand(ctx, view, T) {
     const b = view.bounds(); ctx.fillStyle = T.land; ctx.strokeStyle = T.coast; ctx.lineWidth = 1; ctx.lineJoin = 'round';
@@ -138,13 +156,18 @@ const Chart = {
     ctx.setLineDash([]);
   },
   drawPorts(ctx, view, T, filter) {
-    const b = view.bounds();
+    const b = view.bounds(); const ports = [];
     for (const key of ['A', 'B']) for (const p of GEO.regions[key].ports) {
       if (p.b[0] < b[0] || p.b[0] > b[2] || p.b[1] < b[1] || p.b[1] > b[3]) continue;
       if (!(filter ? filter(p) : (p.major || view.scale > 60))) continue;
+      ports.push(p);
+    }
+    ports.sort((a, c) => (c.major ? 1 : 0) - (a.major ? 1 : 0));          // major ports win the label contest
+    ctx.font = '11px -apple-system, "Instrument Sans", sans-serif';
+    for (const p of ports) {
       const [x, y] = view.project(p.b[0], p.b[1]);
       ctx.beginPath(); ctx.arc(x, y, 2.6, 0, Math.PI * 2); ctx.fillStyle = T.fg; ctx.fill(); ctx.strokeStyle = T.bg; ctx.lineWidth = 1; ctx.stroke();
-      if (SET.portLabels && (view.scale > 24 || p.major || filter)) { ctx.fillStyle = T.label; ctx.font = '11px -apple-system, "Instrument Sans", sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText(p.name, x + 6, y - 1); }
+      if (SET.portLabels && (view.scale > 24 || p.major || filter)) { ctx.fillStyle = T.label; this.label(ctx, p.name, x + 6, y - 1, 'left') || this.label(ctx, p.name, x - 6, y - 1, 'right'); }
     }
   },
   drawFleet(ctx, view, T) {
@@ -153,10 +176,10 @@ const Chart = {
       const p = a.last; if (p.lon < b[0] - 1 || p.lon > b[2] + 1 || p.lat < b[1] - 1 || p.lat > b[3] + 1) continue;
       if (!passFilter(a)) continue;
       const [x, y] = view.project(p.lon, p.lat); const sel = a.v.imo === S.imo; const color = T.types[a.v.type];
-      if (a.sev.high) { ctx.beginPath(); ctx.arc(x, y, 11, 0, Math.PI * 2); ctx.strokeStyle = T.high; ctx.lineWidth = 2; ctx.stroke(); }
+      if (a.sev.high) { ctx.beginPath(); ctx.arc(x, y, 10.5, 0, Math.PI * 2); ctx.fillStyle = T.high; ctx.globalAlpha = 0.16; ctx.fill(); ctx.globalAlpha = 1; ctx.strokeStyle = T.high; ctx.lineWidth = 1.4; ctx.stroke(); }
       if (sel) { ctx.beginPath(); ctx.arc(x, y, 14, 0, Math.PI * 2); ctx.strokeStyle = T.accent; ctx.lineWidth = 2.5; ctx.stroke(); }
-      drawShip(ctx, x, y, p.cog, p.sog, color, T.bg);
-      if (view.scale > 110 || sel) { ctx.fillStyle = T.fg; ctx.font = '600 11px -apple-system, "Instrument Sans", sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText(a.v.name, x + 12, y + 1); }
+      drawShip(ctx, x, y, p.cog, p.sog, color, T.bg, 1.08);
+      if (view.scale > 110 || sel) { ctx.fillStyle = T.fg; ctx.font = '600 11px -apple-system, "Instrument Sans", sans-serif'; this.label(ctx, a.v.name, x + 12, y + 1, 'left'); }
       hits.push({ x, y, a });
     }
     this.hits = hits;
@@ -166,9 +189,10 @@ const Chart = {
     const selN = S.voyage, voys = a.voyages;
     this.drawPorts(ctx, view, T, p => a.portCalls.some(pc => pc.port.id === p.id));
     ctx.lineCap = 'round'; ctx.lineJoin = 'round'; const segHits = [];
+    const recent = new Set(voys.slice(-6).map(v => v.n));
     for (const vg of voys) {
-      const faded = selN && vg.n !== selN; const col = T.v[vg.color];
-      ctx.globalAlpha = faded ? 0.22 : 1; ctx.lineWidth = selN === vg.n ? 3.2 : 2.2; ctx.strokeStyle = col; ctx.setLineDash(vg.current ? [9, 7] : []);
+      const faded = selN ? vg.n !== selN : !recent.has(vg.n); const col = T.v[vg.color];
+      ctx.globalAlpha = faded ? (selN ? 0.18 : 0.32) : 1; ctx.lineWidth = selN === vg.n ? 3.2 : (faded ? 1.6 : 2.2); ctx.strokeStyle = col; ctx.setLineDash(vg.current ? [9, 7] : []);
       ctx.beginPath(); let pen = false, prev = null;
       for (const p of vg.pts) {
         if (p.jump) continue; const [x, y] = view.project(p.lon, p.lat);
@@ -187,26 +211,36 @@ const Chart = {
     const calls = selN ? a.portCalls.filter(pc => { const vg = voys.find(v => v.n === selN); return vg && (pc === vg.from || pc === vg.to); }) : a.portCalls;
     const seen = new Set();
     for (const pc of calls) { if (seen.has(pc.port.id)) continue; seen.add(pc.port.id); const [x, y] = view.project(pc.port.b[0] ?? pc.lon, pc.port.b[1] ?? pc.lat); ctx.beginPath(); ctx.arc(x, y, 3.2, 0, Math.PI * 2); ctx.fillStyle = T.fg; ctx.fill(); ctx.strokeStyle = T.bg; ctx.lineWidth = 1.2; ctx.stroke(); }
-    const hits = [];
-    for (const f of a.flags) {
-      if (f.vesselLevel || (selN && (!f.voyage || f.voyage.n !== selN))) continue;
-      const [x, y] = view.project(f.lon, f.lat); const focus = S.focusFlag === f.id; const col = f.severity === 'high' ? T.high : f.severity === 'medium' ? T.medium : T.info;
-      if (focus) { ctx.beginPath(); ctx.arc(x, y, 16, 0, Math.PI * 2); ctx.strokeStyle = T.accent; ctx.lineWidth = 2.5; ctx.stroke(); }
-      ctx.beginPath(); ctx.arc(x, y, 8.5, 0, Math.PI * 2); ctx.fillStyle = col; ctx.fill(); ctx.strokeStyle = T.bg; ctx.lineWidth = 1.5; ctx.stroke();
-      ctx.fillStyle = T.bg; ctx.font = '700 11px -apple-system, "Instrument Sans", sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('!', x, y + 0.5);
-      hits.push({ x, y, f });
+    const hits = []; const rank = { high: 0, medium: 1, info: 2 }; const clusters = [];
+    const pins = a.flags.filter(f => !(f.vesselLevel || (selN && (!f.voyage || f.voyage.n !== selN)))).sort((p, q) => (rank[p.severity] ?? 3) - (rank[q.severity] ?? 3));
+    for (const f of pins) {                                   // greedy clustering: pins within 22 px share one marker
+      const [x, y] = view.project(f.lon, f.lat); const focus = S.focusFlag === f.id;
+      const c = focus ? null : clusters.find(c => !c.focus && Math.hypot(c.x - x, c.y - y) < 22);
+      if (c) { c.flags.push(f); continue; }
+      clusters.push({ x, y, flags: [f], focus });
+    }
+    for (const c of clusters) {
+      const f = c.flags[0], n = c.flags.length; const col = f.severity === 'high' ? T.high : f.severity === 'medium' ? T.medium : T.info; const r = n > 1 ? 10.5 : 8.5;
+      if (c.focus) { ctx.beginPath(); ctx.arc(c.x, c.y, 16, 0, Math.PI * 2); ctx.strokeStyle = T.accent; ctx.lineWidth = 2.5; ctx.stroke(); }
+      ctx.beginPath(); ctx.arc(c.x, c.y, r + 2.5, 0, Math.PI * 2); ctx.fillStyle = col; ctx.globalAlpha = 0.22; ctx.fill(); ctx.globalAlpha = 1;
+      ctx.beginPath(); ctx.arc(c.x, c.y, r, 0, Math.PI * 2); ctx.fillStyle = col; ctx.fill(); ctx.strokeStyle = T.bg; ctx.lineWidth = 1.5; ctx.stroke();
+      ctx.fillStyle = T.bg; ctx.font = `700 ${n > 1 ? 11 : 11}px -apple-system, "Instrument Sans", sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(n > 1 ? String(n) : '!', c.x, c.y + 0.5);
+      hits.push({ x: c.x, y: c.y, f, flags: c.flags });
     }
     if (S.focusFlag) { const f = a.flags.find(f => f.id === S.focusFlag); if (f && f.evidence) for (const [arr, hollow] of [[f.evidence.before, true], [f.evidence.after, false]]) for (const p of arr) { const [x, y] = view.project(p.lon, p.lat); ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI * 2); ctx.lineWidth = 1.5; ctx.strokeStyle = T.accent; ctx.fillStyle = hollow ? T.bg : T.accent; ctx.fill(); ctx.stroke(); } }
     const last = a.last; const [lx, ly] = view.project(last.lon, last.lat);
     ctx.beginPath(); ctx.arc(lx, ly, 13, 0, Math.PI * 2); ctx.fillStyle = T.accent; ctx.globalAlpha = 0.22; ctx.fill(); ctx.globalAlpha = 1;
     drawShip(ctx, lx, ly, last.cog, last.sog, T.accent, T.bg, 1.15);
-    ctx.fillStyle = T.fg; ctx.font = '700 11px -apple-system, "Instrument Sans", sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText('Now', lx + 14, ly);
+    // the live position always gets its label: an accent pill drawn over anything else
+    ctx.font = '700 10.5px -apple-system, "Instrument Sans", sans-serif'; const nw = ctx.measureText('NOW').width + 12;
+    ctx.beginPath(); ctx.roundRect(lx + 13, ly - 9, nw, 18, 9); ctx.fillStyle = T.accent; ctx.fill(); ctx.strokeStyle = T.bg; ctx.lineWidth = 1.2; ctx.stroke();
+    ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('NOW', lx + 13 + nw / 2, ly + 0.5);
     this.hits = hits; this.segHits = segHits;
   },
   hitTest(x, y) {
     if (S.mode === 'region' || S.mode === 'search') { let best = null, bd = 22; for (const h of this.hits || []) { const d = Math.hypot(h.x - x, h.y - y); if (d < bd) { bd = d; best = h; } } return best ? { type: 'ship', a: best.a } : null; }
     let best = null, bd = 18; for (const h of this.hits || []) { const d = Math.hypot(h.x - x, h.y - y); if (d < bd) { bd = d; best = h; } }
-    if (best) return { type: 'flag', f: best.f };
+    if (best) return { type: 'flag', f: best.f, flags: best.flags || [best.f] };
     let bs = null, sd = 14; for (const s of this.segHits || []) { const d = segDist(x, y, s.x0, s.y0, s.x1, s.y1); if (d < sd) { sd = d; bs = s; } }
     return bs ? { type: 'voyage', vg: bs.vg } : null;
   },
@@ -272,7 +306,9 @@ let moveT = 0;
 function onMoveEnd() { clearTimeout(moveT); moveT = setTimeout(() => { if (S.mode === 'region') renderSheet(); }, 60); }
 function onTap(x, y) {
   const hit = Chart.hitTest(x, y); if (!hit) { if (S.mode === 'region' && S.imo) { S.imo = null; Chart.draw(); renderSheet(); } return; }
-  if (hit.type === 'ship') openVessel(hit.a.v.imo); else if (hit.type === 'flag') focusFlag(hit.f, false); else if (hit.type === 'voyage') openVoyage(hit.vg.n, false);
+  if (hit.type === 'ship') openVessel(hit.a.v.imo);
+  else if (hit.type === 'flag') { if (hit.flags && hit.flags.length > 1 && Chart.scale < 2000) { const pts = hit.flags.map(f => ({ lat: f.lat, lon: f.lon })); const bb = boundsOf(pts); Chart.fitBounds([bb[0] - 0.25, bb[1] - 0.15, bb[2] + 0.25, bb[3] + 0.15]); toast(`${hit.flags.length} flags here — zoomed in`); } else focusFlag(hit.f, false); }
+  else if (hit.type === 'voyage') openVoyage(hit.vg.n, false);
 }
 
 /* ---------------------------------- glass sheet ---------------------------------- */
@@ -281,7 +317,7 @@ const Sheet = {
   init() {
     this.el = $('#sheet'); const grab = $('#grab'); let start = null;
     grab.addEventListener('pointerdown', e => { grab.setPointerCapture(e.pointerId); start = { y: e.clientY, h: this.el.getBoundingClientRect().height }; this.el.classList.add('dragging'); });
-    grab.addEventListener('pointermove', e => { if (!start) return; const h = Math.max(110, Math.min(this.max() - 16, start.h + (start.y - e.clientY))); this.el.style.setProperty('--sheet-h', h + 'px'); });
+    grab.addEventListener('pointermove', e => { if (!start) return; const h = Math.max(110, Math.min(this.max() - 16, start.h + (start.y - e.clientY))); this.el.style.setProperty('--sheet-h', h + 'px'); if (!this._raf) this._raf = requestAnimationFrame(() => { this._raf = 0; Chart.draw(); }); });
     const end = e => { if (!start) return; const moved = Math.abs(e.clientY - start.y); this.el.classList.remove('dragging'); const h = this.el.getBoundingClientRect().height; if (moved < 6) this.snap(this.pos === 'peek' ? 'half' : this.pos === 'half' ? 'full' : 'peek'); else this.snap(h < this.max() * 0.3 ? 'peek' : h < this.max() * 0.7 ? 'half' : 'full'); start = null; };
     grab.addEventListener('pointerup', end); grab.addEventListener('pointercancel', end);
   },
@@ -291,11 +327,19 @@ const Sheet = {
     this.pos = pos; const M = this.max(); const h = pos === 'peek' ? 150 : pos === 'full' ? M - 16 : M * 0.46;
     this.target = pos === 'full' ? M * 0.46 : h; this.el.style.setProperty('--sheet-h', h + 'px'); this.el.classList.toggle('full', pos === 'full');
     $('#tabbar').classList.toggle('hide', pos === 'full');
+    clearTimeout(this._redraw); this._redraw = setTimeout(() => Chart.draw(), 290);   // labels follow the sheet edge
   },
 };
 
 /* ------------------------------------- shared bits ------------------------------------- */
 function typeDot(t) { return `<span class="dot" style="--c:var(--t-${t})"></span>`; }
+const EMPTY_ICON = {
+  anchor: '<svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="2.2"/><path d="M12 7.2V21M5 13H3c0 4.4 4 8 9 8s9-3.6 9-8h-2M8 11h8"/></svg>',
+  radar: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><path d="M12 12l6.5-6.2M12 3v2M21 12h-2"/></svg>',
+  report: '<svg viewBox="0 0 24 24"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4M10 12h5M10 16h5"/></svg>',
+  bell: '<svg viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg>',
+};
+function emptyState(icon, title, text, cta = '') { return `<div class="empty">${EMPTY_ICON[icon] || ''}<b>${title}</b><span>${text}</span>${cta}</div>`; }
 function sevBadge(a) { if (!a.flags.length) return `<span class="badge">0</span>`; return `<span class="badge ${a.sev.high ? 'high' : 'medium'}">${a.flags.length}${a.sev.high ? ' · ' + a.sev.high + 'H' : ''}</span>`; }
 function watchlist() { return store.get('watch', []); }
 function watched(imo) { return watchlist().includes(imo); }
@@ -325,13 +369,13 @@ function renderRegion() {
   const flagged = inView.filter(a => a.sev.high).length;
   return `<div class="sh"><div class="sh-title"><h2>${esc(REGIONS[S.region].label)}</h2><span class="count">${inView.length} in view · ${flagged} with high flags${S.loading ? ' · loading ' + LIVE.length + '/' + FLEET.length : ''}</span></div>
   <div class="filters">${TYPES.map(([k, l]) => `<button class="fchip" data-act="type" data-type="${k}" aria-pressed="${S.type === k}">${k !== 'all' ? `<span class="dot" style="--c:var(--t-${k})"></span>` : ''}${l}</button>`).join('')}<button class="fchip" data-act="flagged" aria-pressed="${S.flaggedOnly}">⚑ High flags only</button></div></div>
-  <ul class="rows">${shown.map(a => vesselRow(a)).join('') || '<li class="empty">No vessels in view. Pan the chart or pick another region.</li>'}</ul>
+  <ul class="rows">${shown.map(a => vesselRow(a)).join('') || `<li>${emptyState('radar', 'Nothing in view', 'Pan the chart or pick another region.')}</li>`}</ul>
   <p class="hint">Sample fleet of ${FLEET.length} fictional vessels with generated 12-month tracks. Tap a ship on the chart or in the list to open its voyages, red flags and identity. Positions refresh from the AIS provider in the production build.</p>`;
 }
 function renderSearch() {
   const res = API.server ? LIVE.filter(a => { const q = S.query.toUpperCase(); return a.v.name.includes(q) || String(a.v.imo).startsWith(q) || (a.v.mmsi || '').startsWith(q); }).map(a => a.v) : Provider.searchVessel(S.query); const dup = new Set(res.map(v => v.name).filter((n, i, arr) => arr.indexOf(n) !== i));
   const rows = res.map(v => { const a = ANALYSIS.get(v.imo); return `<li><button class="row" data-act="open" data-imo="${v.imo}">${typeDot(v.type)}<div class="rmain"><div class="nm"><span>${esc(v.name)}</span>${dup.has(v.name) ? '<span class="badge">same name</span>' : ''}</div><div class="sub2">IMO ${v.imo} · MMSI ${v.mmsi} · ${esc(v.flag)} · ${esc(v.sub)} · ${fmtN(v.dwt)} dwt${v.exNames.length ? ' · ex ' + esc(v.exNames.join(', ')) : ''}</div></div><div class="side">${a ? sevBadge(a) : '<span class="badge">…</span>'}</div></button></li>`; }).join('');
-  return `<div class="sh"><div class="sh-title"><h2>Search</h2><span class="count">${res.length} match${res.length === 1 ? '' : 'es'}</span></div>${dup.size ? '<div class="hint">Several ships share a name. Check IMO, flag and size before you pick one.</div>' : ''}</div><ul class="rows">${rows || `<li class="empty">No vessel matches “${esc(S.query)}”. Try an IMO or MMSI number.</li>`}</ul>`;
+  return `<div class="sh"><div class="sh-title"><h2>Search</h2><span class="count">${res.length} match${res.length === 1 ? '' : 'es'}</span></div>${dup.size ? '<div class="hint">Several ships share a name. Check IMO, flag and size before you pick one.</div>' : ''}</div><ul class="rows">${rows || `<li>${emptyState('radar', 'No match', `Nothing called “${esc(S.query)}”. Try an IMO or MMSI number.`)}</li>`}</ul>`;
 }
 function vesselHeader(a) {
   const v = a.v, st = a.static, cur = a.voyages.find(x => x.current);
@@ -353,7 +397,7 @@ function renderVessel() {
       return `<li><button class="vrow" data-act="voyage" data-n="${vg.n}" aria-current="${S.voyage === vg.n}"><span class="vline" style="--c:var(--v${vg.color});--ls:${vg.current ? 'dashed' : 'solid'}"></span><div><b>V${vg.n}${vg.current ? ' · underway' : ''}</b><span class="route">${vg.from ? esc(vg.from.port.name) : 'History start'} → ${vg.to ? esc(vg.to.port.name) : esc(a.static.destination || '…')}</span><span class="meta ${fl ? 'fl' : ''}">${when}</span></div><span class="side">${fmtN(vg.nm)} nm<br>${vg.arrive ? fmtDur(vg.arrive - vg.depart) : fmtDur(NOW - vg.depart)}</span></button></li>`; }).join('')}</ul>`;
   } else if (S.vtab === 'flags') {
     const rank = { high: 0, medium: 1, info: 2 };
-    const fl = a.flags.slice().sort((x, y) => ((rank[x.severity] ?? 3) - (rank[y.severity] ?? 3)) || ((y.vesselLevel ? 1 : 0) - (x.vesselLevel ? 1 : 0)) || (y.t0 - x.t0)); body = fl.length ? fl.map(f => flagCard(f)).join('') : `<div class="empty">No red flags in the last 12 months.</div>`;
+    const fl = a.flags.slice().sort((x, y) => ((rank[x.severity] ?? 3) - (rank[y.severity] ?? 3)) || ((y.vesselLevel ? 1 : 0) - (x.vesselLevel ? 1 : 0)) || (y.t0 - x.t0)); body = fl.length ? fl.map(f => flagCard(f)).join('') : emptyState('anchor', 'Clean sheet', 'No red flags in the last 12 months.');
     if (API.server) body += crossCheckPanel(v.imo);
   } else if (S.vtab === 'identity') {
     const hist = v.history.slice().sort((x, y) => y.t - x.t); const label = { name: 'Name', flag: 'Flag', mmsi: 'MMSI' };
@@ -454,10 +498,10 @@ function renderVesselsPage() {
   const segs = [['watch', `Watchlist (${watchlist().length})`], ['fleet', 'Fleet'], ['flagged', 'High flags']];
   let list = LIVE.slice(); if (S.vseg === 'watch') list = list.filter(a => watched(a.v.imo)); if (S.vseg === 'flagged') list = list.filter(a => a.sev.high);
   list.sort((x, y) => (y.sev.high - x.sev.high) || (y.flags.length - x.flags.length) || x.v.name.localeCompare(y.v.name));
-  const empty = S.vseg === 'watch' ? 'Your watchlist is empty. Open a vessel and tap Watch; its new flags will show under Alerts.<br><button class="cta" data-act="vseg" data-seg="fleet">Browse the fleet →</button>' : 'Nothing here yet.';
+  const empty = S.vseg === 'watch' ? emptyState('anchor', 'Nothing watched yet', 'Open a vessel and tap Watch; its new flags will show under Alerts.', '<button class="cta" data-act="vseg" data-seg="fleet">Browse the fleet →</button>') : emptyState('radar', 'Nothing here yet', 'No vessel matches this view.');
   return `${topbar('Vessels')}<div class="content"><h1 class="largetitle">Vessels</h1><p class="sub">${LIVE.length} vessels in the sample fleet · ${LIVE.filter(a => a.sev.high).length} with high flags</p>
   <div class="seg">${segs.map(([k, l]) => `<button data-act="vseg" data-seg="${k}" aria-pressed="${S.vseg === k}">${l}</button>`).join('')}</div>
-  <div class="group"><ul class="rows">${list.map(a => vesselRow(a, ` · ${a.v.region === 'A' ? 'Black Sea' : 'Gulf'}`)).join('') || `<li class="empty">${empty}</li>`}</ul></div></div>`;
+  <div class="group"><ul class="rows">${list.map(a => vesselRow(a, ` · ${a.v.region === 'A' ? 'Black Sea' : 'Gulf'}`)).join('') || `<li>${empty}</li>`}</ul></div></div>`;
 }
 function alertsList() {
   const out = [];
@@ -480,7 +524,7 @@ function renderAlertsPage() {
 function renderReportsPage() {
   const reps = store.get('reports', []).slice().reverse();
   return `${topbar('Reports')}<div class="content"><h1 class="largetitle">Reports</h1><p class="sub">Vessel reports generated on this device. Each one carries identity, sanctions screening, the chart, the voyage table and every flag with its evidence.</p>
-  <div class="group">${reps.length ? reps.map(r => { const v = BY_IMO[r.imo]; if (!v) return ''; const a = ANALYSIS.get(r.imo); return `<button class="grow" data-act="openreport" data-imo="${r.imo}">${ico(ICON.reports, 'var(--accent)')}<div class="lbl"><b>${esc(v.name)}</b><span>IMO ${v.imo} · ${a ? a.flags.length + ' flags · ' + a.voyages.length + ' voyages' : ''} · generated ${fmtDT(r.t)} ${TZ()}</span></div><span class="chev">${ICON.chevR}</span></button>`; }).join('') : '<div class="empty">No reports yet. Open a vessel on the chart and tap “Vessel report”.</div>'}</div>
+  <div class="group">${reps.length ? reps.map(r => { const v = BY_IMO[r.imo]; if (!v) return ''; const a = ANALYSIS.get(r.imo); return `<button class="grow" data-act="openreport" data-imo="${r.imo}">${ico(ICON.reports, 'var(--accent)')}<div class="lbl"><b>${esc(v.name)}</b><span>IMO ${v.imo} · ${a ? a.flags.length + ' flags · ' + a.voyages.length + ' voyages' : ''} · generated ${fmtDT(r.t)} ${TZ()}</span></div><span class="chev">${ICON.chevR}</span></button>`; }).join('') : emptyState('report', 'No reports yet', 'Open a vessel on the chart and tap “Vessel report”.')}</div>
   <div class="gh">Scheduled</div><div class="group">${grow('Daily fleet digest', 'Off', 'digest', 'Watchlist summary at 07:00 ' + TZ() + ' · production build', ico(ICON.bell, 'var(--orange)'))}</div>
   ${reps.length ? `<div class="group" style="margin-top:14px"><button class="grow red" data-act="clearreports">Clear report history</button></div>` : ''}</div>`;
 }
@@ -652,6 +696,11 @@ function wireUI() {
   q.addEventListener('focus', () => { if (isMobile() && Sheet.pos === 'peek') Sheet.snap('half'); });
   q.addEventListener('keydown', e => { if (e.key === 'Enter') { const r = Provider.searchVessel(S.query); if (r.length === 1) openVessel(r[0].imo); q.blur(); } });
   $('#qclear').addEventListener('click', () => { q.value = ''; S.query = ''; $('#qclear').hidden = true; if (S.mode === 'search') { S.mode = 'region'; renderSheet(); } q.focus(); });
+  // tab bar minimises while reading (scroll down), returns on scroll up or when the sheet is reset
+  let lastY = 0, miniT = 0;
+  const onScroll = el => { const y = el.scrollTop; const tb = $('#tabbar'); if (y > lastY + 6 && y > 40) tb.classList.add('mini'); else if (y < lastY - 6 || y < 24) tb.classList.remove('mini'); lastY = y; clearTimeout(miniT); miniT = setTimeout(() => { if (el.scrollTop < 24) tb.classList.remove('mini'); }, 900); };
+  $('#sheetBody').addEventListener('scroll', () => onScroll($('#sheetBody')), { passive: true });
+  for (const pg of document.querySelectorAll('.page')) pg.addEventListener('scroll', () => onScroll(pg), { passive: true });
   $('#sheetBody').addEventListener('click', e => {
     const b = e.target.closest('[data-act]'); if (!b) return; const act = b.dataset.act;
     if (act === 'open') openVessel(+b.dataset.imo);

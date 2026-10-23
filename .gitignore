@@ -9,3 +9,4 @@ dist/
 *.pdf
 .DS_Store
 /state/
+/dist/
