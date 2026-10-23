@@ -1,24 +1,28 @@
 services:
   db:
     image: postgis/postgis:16-3.4
-    environment: { POSTGRES_DB: vvt, POSTGRES_USER: vvt, POSTGRES_PASSWORD: vvt }
+    environment: { POSTGRES_DB: vvt, POSTGRES_USER: vvt, POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-vvt}" }
     volumes: [ "pgdata:/var/lib/postgresql/data", "./backend/migrations:/docker-entrypoint-initdb.d:ro" ]
-    ports: [ "5432:5432" ]
+    restart: unless-stopped
   api:
     build: { context: ., dockerfile: backend/Dockerfile }
     env_file: .env
-    environment: { DATABASE_URL: "postgresql://vvt:vvt@db:5432/vvt" }
+    environment: { DATABASE_URL: "${DATABASE_URL:-postgresql://vvt:vvt@db:5432/vvt}" }
     depends_on: [ db ]
-    volumes: [ "reports:/data/reports", "./config:/config:ro" ]
+    volumes: [ "appdata:/data", "./config:/config:ro" ]
+    restart: unless-stopped
     ports: [ "8000:8000" ]
   web:
     build: { context: ., dockerfile: frontend/Dockerfile }
     depends_on: [ api ]
     ports: [ "8080:80" ]
+    restart: unless-stopped
   caddy:
     image: caddy:2.8-alpine
     profiles: [ prod ]
+    environment: { DOMAIN: "${DOMAIN:-localhost}" }
+    restart: unless-stopped
     ports: [ "80:80", "443:443" ]
     volumes: [ "./deploy/Caddyfile:/etc/caddy/Caddyfile:ro", "caddy_data:/data", "caddy_config:/config" ]
     depends_on: [ web, api ]
-volumes: { pgdata: {}, reports: {}, caddy_data: {}, caddy_config: {} }
+volumes: { pgdata: {}, appdata: {}, caddy_data: {}, caddy_config: {} }

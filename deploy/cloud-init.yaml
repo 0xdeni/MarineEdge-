@@ -1,0 +1,25 @@
+#cloud-config
+# MarineEdge · one-paste server setup for Ubuntu 24.04 (Hetzner, DigitalOcean, Vultr, Scaleway: paste as
+# "cloud-init / user data" when creating the server). Edit the three values under "content:" first.
+#
+#   ADMIN_TOKEN  the password you will sign in with (long, no spaces). Leave empty to get a random one
+#                written to /opt/marineedge/.env and /var/log/marineedge-install.log on the server.
+#   DOMAIN       tracker.yourcompany.com (A record → the server's IP), or leave empty to get
+#                https://<ip>.sslip.io with a real certificate and no domain purchase.
+#   AUTO_UPDATE  1 = pull every new commit from GitHub within 10 minutes (good while we build; set 0 later)
+#
+# Five minutes after the server boots, open https://<DOMAIN> on the phone, sign in with any email and the
+# ADMIN_TOKEN, then Profile › AIS provider to paste the Datalastic key.
+write_files:
+  - path: /opt/marineedge-setup.env
+    permissions: "0600"
+    content: |
+      ADMIN_TOKEN=
+      DOMAIN=
+      AUTO_UPDATE=1
+      PROVIDER=mock
+      DATALASTIC_API_KEY=
+package_update: true
+packages: [curl, git]
+runcmd:
+  - [bash, -c, "curl -fsSL https://raw.githubusercontent.com/0xdeni/MarineEdge-/main/deploy/install.sh | bash"]

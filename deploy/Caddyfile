@@ -1,6 +1,6 @@
-# MarineEdge · reverse proxy with automatic HTTPS (Let's Encrypt).
-# Replace tracker.example.com with your domain (DNS A record → the server) before `docker compose --profile prod up`.
-tracker.example.com {
+# MarineEdge · reverse proxy with automatic HTTPS (Let's Encrypt). DOMAIN comes from .env
+# (a real domain with an A record, or <ip>.sslip.io which install.sh picks when no domain is given).
+{$DOMAIN} {
   encode zstd gzip
   # API → FastAPI container
   handle /api/* {

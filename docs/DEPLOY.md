@@ -1,47 +1,54 @@
-# Deploy — one small server, 30 minutes
+# Deploy — one paste, no terminal
 
-Target: a 2 vCPU / 4 GB VPS (Hetzner CX22 or similar) with Ubuntu 24.04, Docker and a domain.
+MarineEdge installs itself on a fresh Ubuntu 24.04 server from a cloud-init file. The whole setup can be
+done from a phone in the hosting provider's app or website. After that, every setting (AIS provider key,
+rules, zones, watchlist, push) is changed inside the app.
 
-## 1. Server
+## 1. Create the server (5 minutes)
+
+Hetzner Cloud (recommended, ~€4–8/month), DigitalOcean, Vultr or Scaleway all take a cloud-init file:
+
+1. Open `deploy/cloud-init.yaml` on GitHub, tap Raw, select all, copy.
+2. In the provider's "create server" screen pick **Ubuntu 24.04**, the smallest 2 vCPU / 4 GB size, any EU location.
+3. Find the **cloud-init / user data** field, paste the file, and edit two lines inside it:
+   - `ADMIN_TOKEN=` → a long passphrase of your choice (this is your sign-in password)
+   - `DOMAIN=` → leave empty for now (you get `https://<ip>.sslip.io` with a real certificate), or your own domain once its A record points at the server
+4. Create the server. Note its IPv4 address.
+
+Five minutes later: `https://<ip with dashes>.sslip.io` (example: IP 95.217.12.34 → `https://95-217-12-34.sslip.io`). Sign in with any email and the ADMIN_TOKEN.
+
+The server pulls every new commit from GitHub within 10 minutes (`AUTO_UPDATE=1`), so fixes arrive without touching it. Set `AUTO_UPDATE=0` in the file later when you want releases to be deliberate.
+
+## 2. Inside the app (phone)
+
+- **Add to Home Screen** (Safari share sheet) so it runs full-screen and can receive push notifications (iOS 16.4+).
+- **Profile › AIS provider**: tap Datalastic, paste the key, "Save key and switch", "Test connection", then type the IMOs and "Run first pull".
+- **Profile › Notifications**: "Enable push notifications on this device".
+- **Watch** a vessel: the refresh job (every 30 minutes) re-analyses watched ships and pushes new High flags.
+
+## 3. What runs on the server
+
+`install.sh` installs Docker, clones the repo to `/opt/marineedge`, writes `.env` (random database password, your admin token, push keys), and starts four containers: PostGIS, the API, the web app, and Caddy (automatic HTTPS). Cron runs the nightly backup (03:00), the sanctions refresh (04:30), the watchlist refresh (every 30 min) and the auto-update (every 10 min). Logs: `/var/log/marineedge-*.log`.
+
+## 4. With a terminal (optional)
+
 ```bash
-apt update && apt install -y docker.io docker-compose-v2 git
-git clone https://github.com/0xdeni/MarineEdge-.git /opt/marineedge && cd /opt/marineedge
-cp .env.example .env            # fill in: VVT_PROVIDER, the provider key, API_TOKENS, UK_SANCTIONS_CSV_URL
-sed -i 's/tracker.example.com/YOUR.DOMAIN/' deploy/Caddyfile
+ssh root@<ip>
+cat /opt/marineedge/.env                               # tokens, keys
+cd /opt/marineedge && docker compose logs -f api       # live logs
+docker compose exec api python -m app.cli first-pull 9000036
+deploy/backup.sh                                       # manual backup; restore with deploy/restore.sh <file>
 ```
-DNS: an A record for YOUR.DOMAIN pointing at the server. Caddy fetches the certificate on first start.
 
-## 2. Start
-```bash
-docker compose --profile prod up -d --build
-docker compose exec api python -m app.cli first-pull <IMO> <IMO>     # acceptance checks on real ships
-cp deploy/marineedge.service /etc/systemd/system/ && systemctl enable marineedge
-cp deploy/cron.d-marineedge /etc/cron.d/marineedge                   # 03:00 backup, 04:30 sanctions refresh
-```
-Open https://YOUR.DOMAIN on the phone, "Add to Home Screen", sign in with your email and the API token from `.env`.
+Add a second user: append `,ana:<token>` (analyst) or `,ana:<token>:admin` to `API_TOKENS` in `.env`, then `docker compose restart api`. Company SSO (Google Workspace / Microsoft Entra) goes in front of Caddy with oauth2-proxy when you are ready; tokens remain for the CLI and cron.
 
-## 3. Backups
-`deploy/backup.sh` keeps 14 nightly `pg_dump` files in `backups/` and copies them off-site when `RCLONE_REMOTE` is set (any S3-compatible bucket). Restore with `deploy/restore.sh <file>`. Test a restore once before trusting it.
+## 5. Backups
 
-## 4. Access control
-- `API_TOKENS` protects every `/api/*` route (Bearer token or `X-API-Key`); `/api/health` stays open.
-- For company SSO, put oauth2-proxy (Google Workspace or Microsoft Entra) in front of Caddy's `web` handler and keep tokens for the CLI and cron. The frontend only needs the `Authorization` header to reach the API.
-- Never commit `.env`. Rotate a token by editing `.env` and `docker compose restart api`.
+`deploy/backup.sh` keeps 14 nightly `pg_dump` files in `/opt/marineedge/backups/` and copies them off-site when `RCLONE_REMOTE` is set in `.env` (any S3-compatible bucket). Test one restore before trusting it.
 
-## 4b. Push notifications
-```bash
-docker compose exec api python -m app.push keygen      # paste the three lines into .env, then docker compose restart api
-```
-On the phone: Profile › Notifications › Enable push notifications. The refresh job (every 30 min via cron) pushes new High flags on watched vessels. iOS needs the app added to the Home Screen first.
+## 6. Costs
 
-## 5. Updating
-```bash
-cd /opt/marineedge && git pull && docker compose --profile prod up -d --build
-```
-Bump `VERSION` in `frontend/public/sw.js` with every frontend change so installed phones refresh their cache.
-
-## 6. Watching costs
-`fetch_log` in Postgres has one row per paid fetch with its credit estimate:
+`fetch_log` has one row per paid fetch with its credit estimate; the admin screen shows credits used since the last restart:
 ```sql
 SELECT provider, date_trunc('month', fetched_at) m, count(*) fetches, sum(credits) credits FROM fetch_log GROUP BY 1,2 ORDER BY 2 DESC;
 ```

@@ -22,7 +22,10 @@ class Service:
         self.ref = ref or load_refdata()
         self.rules = rules or load_rules()
         self.store = store or make_store()
+        self._pinned = provider is not None          # tests pass a provider: never swapped by the settings file
         self.provider = provider or self._make(None)
+        from app import settings_store
+        self._settings_version = settings_store.version()
         self.now = now_ms
         self.fetches = 0
         self._cache: dict[int, Analysis] = {}
@@ -36,17 +39,30 @@ class Service:
         nm = (name or settings_store.provider_name()).lower()
         return make_provider(nm, api_key=api_key, ref=self.ref) if nm == "mock" else make_provider(nm, api_key=api_key)
 
+    def _sync(self) -> None:
+        """Rebuild the provider when another worker (or the CLI) changed the settings file."""
+        if self._pinned:
+            return
+        from app import settings_store
+        v = settings_store.version()
+        if v != self._settings_version:
+            self.provider = self._make(None)
+            self._settings_version = v
+            self._cache.clear()
+
     def set_provider(self, name: str, api_key: Optional[str] = None) -> dict:
         """Admin action from the app: switch provider and/or key without a restart. The old provider's
         analyses are dropped from the memory cache; stored positions stay (they are keyed on IMO)."""
         from app import settings_store
         settings_store.set_provider(name, api_key)
         self.provider = self._make(name, api_key)
+        self._settings_version = settings_store.version()
         self._cache.clear()
         return {"provider": getattr(self.provider, "name", name)}
 
     def test_provider(self) -> dict:
         """One cheap call to prove the key works: a name search (1 credit on Datalastic, 0 on mock)."""
+        self._sync()
         t0 = time.perf_counter()
         try:
             res = self.provider.search_vessel("MAERSK")
@@ -97,6 +113,7 @@ class Service:
 
     # ---- steps 1-2 ----
     def search(self, q: str):
+        self._sync()
         return self.provider.search_vessel(q)
 
     # ---- steps 3-8 ----
@@ -118,6 +135,7 @@ class Service:
         return self.store.get_positions(imo, start, end) or pts
 
     def analysis(self, imo: int, refresh: bool = False) -> Analysis:
+        self._sync()
         if not refresh and imo in self._cache:
             return self._cache[imo]
         v = self.provider.get_vessel(imo)
@@ -138,6 +156,7 @@ class Service:
         return a
 
     def region(self, bbox: tuple[float, float, float, float]) -> list[dict]:
+        self._sync()
         out = []
         for v, p in self.provider.get_vessels_in_area(bbox):
             a = self._cache.get(v.imo)

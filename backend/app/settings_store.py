@@ -13,6 +13,14 @@ FILE = DATA_DIR / "settings.json"
 KEY_ENV = {"datalastic": "DATALASTIC_API_KEY", "kpler": "KPLER_API_KEY"}
 
 
+def version() -> int:
+    """Changes whenever the file is written; lets every API worker notice an admin change."""
+    try:
+        return FILE.stat().st_mtime_ns
+    except OSError:
+        return 0
+
+
 def load() -> dict[str, Any]:
     try:
         return json.loads(FILE.read_text(encoding="utf-8"))
@@ -41,8 +49,10 @@ def provider_key(name: str) -> str:
 
 
 def set_provider(name: str, api_key: str | None) -> None:
+    import time
     d = load()
     d["provider"] = name
+    d["updated"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     if api_key:
         d.setdefault("keys", {})[name] = api_key.strip()
     save(d)
