@@ -60,7 +60,7 @@ Put the key in `.env`, set `VVT_PROVIDER=datalastic` (or `kpler` once the adapte
 
 ## Deploy
 
-`docs/DEPLOY.md`: one VPS, Docker Compose with Caddy for HTTPS, nightly backups, sanctions cron. Set `API_TOKENS` in `.env` to protect the API.
+One paste: `deploy/cloud-init.yaml` into any Ubuntu 24.04 cloud server's user-data field (Hetzner, DigitalOcean, Vultr). It installs Docker, PostGIS, the API, the web app and Caddy with HTTPS, and auto-updates from GitHub. Then everything else is done inside the app. Details: `docs/DEPLOY.md`.
 
 ## Layout
 

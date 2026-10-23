@@ -1,4 +1,4 @@
-# Status — 23 Oct 2026
+# Status — 23 Oct 2026 (night)
 
 Links: repo https://github.com/0xdeni/MarineEdge- · PWA prototype https://claude.ai/artifact/58pvuQYeUG1SCMQPxCPUBF · website canvas https://claude.ai/artifact/4oWLpjGRkTYuwPXWBpYgmi · owner checklist `docs/OWNER-CHECKLIST.md`
 
@@ -9,7 +9,9 @@ Links: repo https://github.com/0xdeni/MarineEdge- · PWA prototype https://claud
 | M1 Foundations (steps 0–4) | **Done on mock data; waiting for a key** | Repo, PostGIS schema, adapter interface, mock provider, Datalastic adapter (field names from public docs, unverified), Kpler stub, search endpoint, cache rule with `fetch_log`, CLI with `first-pull` acceptance checks, API token auth. |
 | M2 Voyage map (5–6) | **Done on mock data** | Port calls, voyages, chart with MapLibre/OpenFreeMap tiles under the canvas overlay (verified with a stand-in map object; needs one look on a real network) and schematic fallback offline. |
 | M3 Red flags (7–8) | **Done on synthetic tracks** | All seven rules, 29 tests pass (19 engine, 4 sanctions parsers, 4 service/cache, 2 fleet regression), flag panel with evidence and "show on chart", OFAC/EU/UK/OpenSanctions parsers, STS lookup cap. |
-| M4 Report and go-live (9–10) | **Report done; deploy files written, not yet run on a server** | Jinja2 → Playwright PDF; Docker Compose with Caddy (auto-HTTPS), systemd unit, nightly backup + restore scripts, cron for sanctions refresh, `docs/DEPLOY.md`. |
+| M4 Report and go-live (9–10) | **Report done; one-paste installer written, not yet run on a server** | Jinja2 → Playwright PDF; `deploy/cloud-init.yaml` + `install.sh` set up Docker, PostGIS, API, web, Caddy (auto-HTTPS on a domain or `<ip>.sslip.io`), push keys, cron (backup, sanctions, watchlist refresh, auto-update from GitHub). |
+
+Phone-only operation: the AIS provider and its key, the connection test, the first-pull acceptance checks and the job triggers are all in the app (Profile › AIS provider, admin token). The server installs itself from a cloud-init paste in the hosting provider's app and auto-updates from GitHub.
 
 Beyond the brief: iOS-style PWA shell (glass tab bar and sheet), login, Vessels/Alerts/Reports/Profile pages, Settings that edit rules, zones, provider, appearance, map tiles; watchlist refresh job that turns new flags into alerts and Web Push notifications; server-side watchlist and notes per user; World Port Index importer; dependency-free dev server; marketing landing page on a design canvas.
 
@@ -23,9 +25,9 @@ Beyond the brief: iOS-style PWA shell (glass tab bar and sheet), login, Vessels/
 - **Datalastic first** as the real adapter (public credit plans, historical area scan, no contract). Kpler stub ready for the second trial.
 - **Auth:** API tokens in `.env` now; SSO (Google/Microsoft via oauth2-proxy in front of Caddy) at go-live.
 
-## Blocked on Deni
+## Blocked on Deni (iPhone only, no terminal needed)
 
-See `docs/OWNER-CHECKLIST.md`. Shortest version: Datalastic key → `first-pull` output; Kpler answers; 5–10 real IMOs; a VPS + domain; identity provider.
+See `docs/OWNER-CHECKLIST.md`. Shortest version: create a Hetzner server with the cloud-init paste → open the app → paste the Datalastic key → run first pull → screenshots to me. Then Kpler answers, a domain, the identity provider.
 
 ## Next engineering steps (no input needed)
 
@@ -43,3 +45,4 @@ See `docs/OWNER-CHECKLIST.md`. Shortest version: Datalastic key → `first-pull`
 - `get_vessels_near` on a paid provider costs one historical area scan per slow-drift window; capped at `sts.max_lookups_per_vessel` (12) per run.
 - UK CSV link changes with each publication and is set by hand in `.env` for now.
 - The PWA login is a token prompt in server mode and cosmetic in offline mode; SSO comes at go-live.
+- The installer and Docker build have not run on a real server yet (no Docker here); first boot may need one fix, which auto-update delivers within 10 minutes of the push.
