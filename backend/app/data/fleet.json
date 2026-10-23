@@ -1,0 +1,1159 @@
+{
+ "fleet": [
+  {
+   "name": "PONTIC HARVEST",
+   "imo": 9000011,
+   "flag": "Marshall Islands",
+   "type": "bulk",
+   "sub": "Panamax bulk carrier",
+   "dwt": 76400,
+   "built": 2011,
+   "region": "A",
+   "trade": "bs_grain",
+   "risk": 0.1,
+   "opts": {}
+  },
+  {
+   "name": "DOBRUJA STAR",
+   "imo": 9000012,
+   "flag": "Malta",
+   "type": "bulk",
+   "sub": "Supramax bulk carrier",
+   "dwt": 56800,
+   "built": 2009,
+   "region": "A",
+   "trade": "bs_grain",
+   "risk": 0.15,
+   "opts": {}
+  },
+  {
+   "name": "AZOV CRESCENT",
+   "imo": 9000013,
+   "flag": "Panama",
+   "type": "bulk",
+   "sub": "Handysize bulk carrier",
+   "dwt": 33500,
+   "built": 2004,
+   "region": "A",
+   "trade": "bs_grain",
+   "risk": 0.8,
+   "opts": {
+    "ex": [
+     "SILVER DUNE"
+    ],
+    "hist": [
+     [
+      "name",
+      "SILVER DUNE",
+      "AZOV CRESCENT",
+      7
+     ],
+     [
+      "flag",
+      "Comoros",
+      "Panama",
+      7
+     ],
+     [
+      "mmsi",
+      "616",
+      null,
+      7
+     ]
+    ]
+   }
+  },
+  {
+   "name": "KUBAN SPIRIT",
+   "imo": 9000014,
+   "flag": "Gabon",
+   "type": "tanker",
+   "sub": "Aframax crude tanker",
+   "dwt": 112800,
+   "built": 2006,
+   "region": "A",
+   "trade": "bs_oil",
+   "risk": 0.9,
+   "opts": {
+    "sanctions": [
+     [
+      "OFAC SDN",
+      "2026-03-14",
+      "RUSSIA-EO14024"
+     ],
+     [
+      "EU",
+      "2026-04-02",
+      "Reg. 833/2014, Annex XLII"
+     ]
+    ],
+    "hist": [
+     [
+      "flag",
+      "Panama",
+      "Gabon",
+      5
+     ],
+     [
+      "mmsi",
+      "352",
+      null,
+      5
+     ]
+    ],
+    "opaque": true
+   }
+  },
+  {
+   "name": "MARMARA PEARL",
+   "imo": 9000015,
+   "flag": "Türkiye",
+   "type": "container",
+   "sub": "Feeder container ship · 1,700 TEU",
+   "dwt": 24100,
+   "built": 2015,
+   "region": "A",
+   "trade": "bs_box",
+   "risk": 0.05,
+   "opts": {}
+  },
+  {
+   "name": "ANATOLIAN GRAIN",
+   "imo": 9000016,
+   "flag": "Türkiye",
+   "type": "bulk",
+   "sub": "Handymax bulk carrier",
+   "dwt": 45300,
+   "built": 2012,
+   "region": "A",
+   "trade": "bs_grain",
+   "risk": 0.2,
+   "opts": {}
+  },
+  {
+   "name": "TAURUS VOYAGER",
+   "imo": 9000017,
+   "flag": "Liberia",
+   "type": "tanker",
+   "sub": "MR product tanker",
+   "dwt": 49900,
+   "built": 2017,
+   "region": "A",
+   "trade": "bs_oil",
+   "risk": 0.3,
+   "opts": {}
+  },
+  {
+   "name": "SARMATIA",
+   "imo": 9000018,
+   "flag": "Greece",
+   "type": "bulk",
+   "sub": "Panamax bulk carrier",
+   "dwt": 81200,
+   "built": 2019,
+   "region": "A",
+   "trade": "bs_grain",
+   "risk": 0.1,
+   "opts": {}
+  },
+  {
+   "name": "SILVER REACH",
+   "imo": 9000019,
+   "flag": "Cameroon",
+   "type": "other",
+   "sub": "General cargo ship",
+   "dwt": 8900,
+   "built": 2001,
+   "region": "A",
+   "trade": "bs_gen",
+   "risk": 0.95,
+   "opts": {
+    "ex": [
+     "ORION LEGEND"
+    ],
+    "sanctions": [
+     [
+      "EU",
+      "2025-12-16",
+      "Reg. 2022/263 (Crimea)"
+     ],
+     [
+      "UK",
+      "2026-01-20",
+      "Russia (Sanctions) Regulations"
+     ]
+    ],
+    "hist": [
+     [
+      "name",
+      "ORION LEGEND",
+      "SILVER REACH",
+      9
+     ],
+     [
+      "flag",
+      "Togo",
+      "Cameroon",
+      4
+     ],
+     [
+      "mmsi",
+      "671",
+      null,
+      4
+     ]
+    ],
+    "opaque": true
+   }
+  },
+  {
+   "name": "COLCHIS TRADER",
+   "imo": 9000021,
+   "flag": "Georgia",
+   "type": "bulk",
+   "sub": "Handysize bulk carrier",
+   "dwt": 37100,
+   "built": 2010,
+   "region": "A",
+   "trade": "bs_grain",
+   "risk": 0.25,
+   "opts": {}
+  },
+  {
+   "name": "BOSPORUS LINK",
+   "imo": 9000022,
+   "flag": "Liberia",
+   "type": "container",
+   "sub": "Container ship · 2,500 TEU",
+   "dwt": 35200,
+   "built": 2008,
+   "region": "A",
+   "trade": "bs_box",
+   "risk": 0.1,
+   "opts": {}
+  },
+  {
+   "name": "THRACIAN SUN",
+   "imo": 9000023,
+   "flag": "Marshall Islands",
+   "type": "tanker",
+   "sub": "Suezmax crude tanker",
+   "dwt": 157000,
+   "built": 2010,
+   "region": "A",
+   "trade": "bs_oil",
+   "risk": 0.55,
+   "opts": {}
+  },
+  {
+   "name": "KARADENIZ ARROW",
+   "imo": 9000024,
+   "flag": "Panama",
+   "type": "bulk",
+   "sub": "Ultramax bulk carrier",
+   "dwt": 63300,
+   "built": 2020,
+   "region": "A",
+   "trade": "bs_grain",
+   "risk": 0.1,
+   "opts": {}
+  },
+  {
+   "name": "MEOTIDA",
+   "imo": 9000025,
+   "flag": "Russia",
+   "type": "other",
+   "sub": "General cargo ship",
+   "dwt": 5200,
+   "built": 1998,
+   "region": "A",
+   "trade": "bs_gen",
+   "risk": 0.85,
+   "opts": {}
+  },
+  {
+   "name": "HALKIDIKI BREEZE",
+   "imo": 9000026,
+   "flag": "Cyprus",
+   "type": "bulk",
+   "sub": "Kamsarmax bulk carrier",
+   "dwt": 82000,
+   "built": 2016,
+   "region": "A",
+   "trade": "bs_grain",
+   "risk": 0.15,
+   "opts": {}
+  },
+  {
+   "name": "LEVANT STAR",
+   "imo": 9000027,
+   "flag": "Cameroon",
+   "type": "tanker",
+   "sub": "MR product tanker",
+   "dwt": 47000,
+   "built": 2004,
+   "region": "A",
+   "trade": "bs_oil",
+   "risk": 0.9,
+   "opts": {
+    "ex": [
+     "ATLAS KING"
+    ],
+    "sanctions": [
+     [
+      "OFAC SDN",
+      "2026-05-08",
+      "SYRIA"
+     ]
+    ],
+    "hist": [
+     [
+      "name",
+      "ATLAS KING",
+      "LEVANT STAR",
+      6
+     ],
+     [
+      "flag",
+      "Palau",
+      "Cameroon",
+      6
+     ],
+     [
+      "mmsi",
+      "511",
+      null,
+      6
+     ]
+    ],
+    "opaque": true
+   }
+  },
+  {
+   "name": "BLUE HORIZON",
+   "imo": 9000028,
+   "flag": "Malta",
+   "type": "bulk",
+   "sub": "Handymax bulk carrier",
+   "dwt": 46500,
+   "built": 2013,
+   "region": "A",
+   "trade": "bs_grain",
+   "risk": 0.1,
+   "opts": {}
+  },
+  {
+   "name": "LYMAN WIND",
+   "imo": 9000029,
+   "flag": "Palau",
+   "type": "bulk",
+   "sub": "Panamax bulk carrier",
+   "dwt": 74200,
+   "built": 2007,
+   "region": "A",
+   "trade": "bs_grain",
+   "risk": 0.6,
+   "opts": {}
+  },
+  {
+   "name": "KAVKAZ PIONEER",
+   "imo": 9000031,
+   "flag": "Russia",
+   "type": "other",
+   "sub": "Ro-ro cargo ship",
+   "dwt": 9000,
+   "built": 2003,
+   "region": "A",
+   "trade": "bs_gen",
+   "risk": 0.5,
+   "opts": {}
+  },
+  {
+   "name": "AEGEAN GLORY",
+   "imo": 9000032,
+   "flag": "Malta",
+   "type": "container",
+   "sub": "Container ship · 3,500 TEU",
+   "dwt": 48000,
+   "built": 2012,
+   "region": "A",
+   "trade": "bs_box",
+   "risk": 0.05,
+   "opts": {}
+  },
+  {
+   "name": "BLUE HORIZON",
+   "imo": 9000033,
+   "flag": "Panama",
+   "type": "tanker",
+   "sub": "Aframax crude tanker",
+   "dwt": 105000,
+   "built": 2008,
+   "region": "B",
+   "trade": "g_crude",
+   "risk": 0.3,
+   "opts": {}
+  },
+  {
+   "name": "ORYX PEARL",
+   "imo": 9000034,
+   "flag": "Marshall Islands",
+   "type": "tanker",
+   "sub": "VLCC",
+   "dwt": 300000,
+   "built": 2014,
+   "region": "B",
+   "trade": "g_crude",
+   "risk": 0.1,
+   "opts": {}
+  },
+  {
+   "name": "AL BATINAH",
+   "imo": 9000035,
+   "flag": "Oman",
+   "type": "bulk",
+   "sub": "Supramax bulk carrier",
+   "dwt": 57000,
+   "built": 2011,
+   "region": "B",
+   "trade": "g_bulk",
+   "risk": 0.1,
+   "opts": {}
+  },
+  {
+   "name": "HORMUZ QUEEN",
+   "imo": 9000036,
+   "flag": "Gabon",
+   "type": "tanker",
+   "sub": "MR product tanker",
+   "dwt": 46000,
+   "built": 2003,
+   "region": "B",
+   "trade": "g_prod",
+   "risk": 0.95,
+   "opts": {
+    "ex": [
+     "SEA PROSPER"
+    ],
+    "sanctions": [
+     [
+      "OFAC SDN",
+      "2026-02-11",
+      "IRAN-EO13902"
+     ],
+     [
+      "UK",
+      "2026-03-30",
+      "Iran (Sanctions) Regulations"
+     ]
+    ],
+    "hist": [
+     [
+      "name",
+      "SEA PROSPER",
+      "HORMUZ QUEEN",
+      8
+     ],
+     [
+      "flag",
+      "Panama",
+      "Gabon",
+      8
+     ],
+     [
+      "mmsi",
+      "352",
+      null,
+      8
+     ]
+    ],
+    "opaque": true
+   }
+  },
+  {
+   "name": "GULF CRESCENT",
+   "imo": 9000037,
+   "flag": "Liberia",
+   "type": "container",
+   "sub": "Container ship · 5,000 TEU",
+   "dwt": 65000,
+   "built": 2016,
+   "region": "B",
+   "trade": "g_box",
+   "risk": 0.05,
+   "opts": {}
+  },
+  {
+   "name": "DHOW SPIRIT",
+   "imo": 9000038,
+   "flag": "UAE",
+   "type": "other",
+   "sub": "General cargo ship",
+   "dwt": 12000,
+   "built": 2005,
+   "region": "B",
+   "trade": "g_bulk",
+   "risk": 0.5,
+   "opts": {}
+  },
+  {
+   "name": "MUSANDAM TRADER",
+   "imo": 9000039,
+   "flag": "Panama",
+   "type": "bulk",
+   "sub": "Handysize bulk carrier",
+   "dwt": 35000,
+   "built": 2009,
+   "region": "B",
+   "trade": "g_bulk",
+   "risk": 0.2,
+   "opts": {}
+  },
+  {
+   "name": "ZAGROS GLORY",
+   "imo": 9000041,
+   "flag": "Iran",
+   "type": "bulk",
+   "sub": "Panamax bulk carrier",
+   "dwt": 76000,
+   "built": 2010,
+   "region": "B",
+   "trade": "g_bulk",
+   "risk": 0.7,
+   "opts": {}
+  },
+  {
+   "name": "ARABIAN FALCON",
+   "imo": 9000042,
+   "flag": "Qatar",
+   "type": "gas",
+   "sub": "LNG carrier · 174,000 m³",
+   "dwt": 95000,
+   "built": 2019,
+   "region": "B",
+   "trade": "g_gas",
+   "risk": 0.05,
+   "opts": {}
+  },
+  {
+   "name": "SOHAR SUN",
+   "imo": 9000043,
+   "flag": "Oman",
+   "type": "bulk",
+   "sub": "Supramax bulk carrier",
+   "dwt": 58000,
+   "built": 2018,
+   "region": "B",
+   "trade": "g_bulk",
+   "risk": 0.1,
+   "opts": {}
+  },
+  {
+   "name": "DESERT ROSE",
+   "imo": 9000044,
+   "flag": "Marshall Islands",
+   "type": "tanker",
+   "sub": "LR2 product tanker",
+   "dwt": 110000,
+   "built": 2012,
+   "region": "B",
+   "trade": "g_prod",
+   "risk": 0.45,
+   "opts": {}
+  },
+  {
+   "name": "TIGRIS STAR",
+   "imo": 9000045,
+   "flag": "Panama",
+   "type": "container",
+   "sub": "Feeder container ship · 1,400 TEU",
+   "dwt": 20000,
+   "built": 2007,
+   "region": "B",
+   "trade": "g_box",
+   "risk": 0.15,
+   "opts": {}
+  },
+  {
+   "name": "KHALIJ MOON",
+   "imo": 9000046,
+   "flag": "Cameroon",
+   "type": "tanker",
+   "sub": "Aframax crude tanker",
+   "dwt": 108000,
+   "built": 2004,
+   "region": "B",
+   "trade": "g_crude",
+   "risk": 0.9,
+   "opts": {
+    "sanctions": [
+     [
+      "EU",
+      "2026-01-26",
+      "Reg. 267/2012"
+     ],
+     [
+      "UK",
+      "2026-02-14",
+      "Iran (Sanctions) Regulations"
+     ]
+    ],
+    "hist": [
+     [
+      "mmsi",
+      "626",
+      null,
+      3
+     ],
+     [
+      "flag",
+      "Gabon",
+      "Cameroon",
+      3
+     ]
+    ],
+    "opaque": true
+   }
+  },
+  {
+   "name": "DUQM HORIZON",
+   "imo": 9000047,
+   "flag": "Oman",
+   "type": "bulk",
+   "sub": "Ultramax bulk carrier",
+   "dwt": 62000,
+   "built": 2021,
+   "region": "B",
+   "trade": "g_bulk",
+   "risk": 0.05,
+   "opts": {}
+  },
+  {
+   "name": "INDUS GRAIN",
+   "imo": 9000048,
+   "flag": "India",
+   "type": "bulk",
+   "sub": "Handymax bulk carrier",
+   "dwt": 48000,
+   "built": 2006,
+   "region": "B",
+   "trade": "g_bulk",
+   "risk": 0.55,
+   "opts": {}
+  },
+  {
+   "name": "PEARL OF SALALAH",
+   "imo": 9000049,
+   "flag": "Singapore",
+   "type": "container",
+   "sub": "Container ship · 8,000 TEU",
+   "dwt": 90000,
+   "built": 2015,
+   "region": "B",
+   "trade": "g_box",
+   "risk": 0.05,
+   "opts": {}
+  },
+  {
+   "name": "QATARI BREEZE",
+   "imo": 9000051,
+   "flag": "Marshall Islands",
+   "type": "gas",
+   "sub": "LPG carrier · 82,000 m³",
+   "dwt": 54000,
+   "built": 2013,
+   "region": "B",
+   "trade": "g_gas",
+   "risk": 0.1,
+   "opts": {}
+  },
+  {
+   "name": "RUB AL KHALI",
+   "imo": 9000052,
+   "flag": "UAE",
+   "type": "tanker",
+   "sub": "MR product tanker",
+   "dwt": 50000,
+   "built": 2016,
+   "region": "B",
+   "trade": "g_prod",
+   "risk": 0.15,
+   "opts": {}
+  },
+  {
+   "name": "BANDAR WIND",
+   "imo": 9000053,
+   "flag": "Palau",
+   "type": "other",
+   "sub": "General cargo ship",
+   "dwt": 7500,
+   "built": 2000,
+   "region": "B",
+   "trade": "g_bulk",
+   "risk": 0.8,
+   "opts": {
+    "ex": [
+     "NORTHERN LARK"
+    ],
+    "hist": [
+     [
+      "name",
+      "NORTHERN LARK",
+      "BANDAR WIND",
+      5
+     ],
+     [
+      "flag",
+      "Sierra Leone",
+      "Palau",
+      5
+     ],
+     [
+      "mmsi",
+      "667",
+      null,
+      5
+     ]
+    ]
+   }
+  },
+  {
+   "name": "SUR LEGACY",
+   "imo": 9000054,
+   "flag": "Panama",
+   "type": "bulk",
+   "sub": "Handysize bulk carrier",
+   "dwt": 32000,
+   "built": 2008,
+   "region": "B",
+   "trade": "g_bulk",
+   "risk": 0.2,
+   "opts": {}
+  }
+ ],
+ "trades": {
+  "bs_grain": [
+   "ODS",
+   "CHO",
+   "PIV",
+   "CND",
+   "VAR",
+   "BOJ",
+   "NVS",
+   "TAM",
+   "SAM",
+   "MER",
+   "ISK",
+   "ALY",
+   "DAM",
+   "PSD",
+   "BAT",
+   "POT"
+  ],
+  "bs_oil": [
+   "NVS",
+   "TUA",
+   "TAM",
+   "KAV",
+   "CND",
+   "BOJ",
+   "SPS",
+   "BAT",
+   "MER",
+   "CEY",
+   "ALY",
+   "AMB",
+   "IZT",
+   "LIM",
+   "HAI"
+  ],
+  "bs_box": [
+   "ODS",
+   "CND",
+   "VAR",
+   "NVS",
+   "AMB",
+   "GEM",
+   "MER",
+   "PSD",
+   "POT",
+   "PIR",
+   "HAI",
+   "LIM"
+  ],
+  "bs_gen": [
+   "SAM",
+   "TRA",
+   "BAT",
+   "POT",
+   "BND",
+   "ISK",
+   "MER",
+   "VAR",
+   "CND",
+   "ODS",
+   "KAV",
+   "TAM"
+  ],
+  "g_crude": [
+   "RTA",
+   "MAA",
+   "BOT",
+   "JUB",
+   "RUW",
+   "DAS",
+   "FJR",
+   "SOH"
+  ],
+  "g_prod": [
+   "RUW",
+   "FJR",
+   "JEA",
+   "SOH",
+   "MCT",
+   "SLL",
+   "DMM",
+   "BAH",
+   "MES",
+   "DUQ"
+  ],
+  "g_bulk": [
+   "JEA",
+   "SOH",
+   "DUQ",
+   "SLL",
+   "KHL",
+   "HMD",
+   "DMM",
+   "UMQ",
+   "KWI",
+   "JUB",
+   "GWD",
+   "MCT",
+   "BAH"
+  ],
+  "g_box": [
+   "JEA",
+   "KHF",
+   "SLL",
+   "KHL",
+   "HMD",
+   "SOH",
+   "DMM",
+   "UMQ",
+   "KWI",
+   "BAH",
+   "MCT",
+   "GWD",
+   "DXB",
+   "SHJ"
+  ],
+  "g_gas": [
+   "RLF",
+   "DAS",
+   "MES",
+   "RUW",
+   "SOH",
+   "FJR",
+   "JEA"
+  ]
+ },
+ "sensitive_ports": {
+  "A": [
+   "SEV",
+   "FEO",
+   "KER",
+   "BER",
+   "MAR",
+   "TAR",
+   "LAT"
+  ],
+  "B": [
+   "BND2",
+   "BUZ",
+   "KHK",
+   "BIK",
+   "ASA",
+   "LEN",
+   "CHB",
+   "JSK"
+  ]
+ },
+ "mid": {
+  "Panama": [
+   "351",
+   "352",
+   "353",
+   "370",
+   "371"
+  ],
+  "Liberia": [
+   "636",
+   "637"
+  ],
+  "Marshall Islands": [
+   "538"
+  ],
+  "Malta": [
+   "215",
+   "229",
+   "248",
+   "256"
+  ],
+  "Türkiye": [
+   "271"
+  ],
+  "Greece": [
+   "237",
+   "239",
+   "240"
+  ],
+  "Cyprus": [
+   "209",
+   "210",
+   "212"
+  ],
+  "Togo": [
+   "671"
+  ],
+  "Cameroon": [
+   "613"
+  ],
+  "Gabon": [
+   "626"
+  ],
+  "Palau": [
+   "511"
+  ],
+  "Comoros": [
+   "616"
+  ],
+  "Sierra Leone": [
+   "667"
+  ],
+  "UAE": [
+   "470",
+   "471"
+  ],
+  "Oman": [
+   "461"
+  ],
+  "Iran": [
+   "422"
+  ],
+  "Russia": [
+   "273"
+  ],
+  "Georgia": [
+   "213"
+  ],
+  "Qatar": [
+   "466"
+  ],
+  "India": [
+   "419"
+  ],
+  "Singapore": [
+   "563",
+   "564",
+   "565"
+  ],
+  "Saudi Arabia": [
+   "403"
+  ],
+  "Kuwait": [
+   "447"
+  ],
+  "Bahamas": [
+   "308",
+   "309",
+   "311"
+  ]
+ },
+ "callsign_prefix": {
+  "Panama": "3F",
+  "Liberia": "D5",
+  "Marshall Islands": "V7",
+  "Malta": "9H",
+  "Türkiye": "TC",
+  "Greece": "SV",
+  "Cyprus": "5B",
+  "Togo": "5V",
+  "Cameroon": "TJ",
+  "Gabon": "TR",
+  "Palau": "T8",
+  "Comoros": "D6",
+  "Sierra Leone": "9L",
+  "UAE": "A6",
+  "Oman": "A4",
+  "Iran": "EP",
+  "Russia": "UB",
+  "Georgia": "4L",
+  "Qatar": "A7",
+  "India": "VT",
+  "Singapore": "9V",
+  "Saudi Arabia": "HZ",
+  "Kuwait": "9K",
+  "Bahamas": "C6"
+ },
+ "iacs": [
+  "DNV",
+  "Lloyd’s Register",
+  "ABS",
+  "Bureau Veritas",
+  "RINA",
+  "ClassNK",
+  "KR",
+  "CCS",
+  "IRS",
+  "Türk Loydu"
+ ],
+ "ig_pi": [
+  "Gard",
+  "Skuld",
+  "NorthStandard",
+  "West P&I",
+  "Britannia",
+  "UK P&I Club",
+  "Steamship Mutual",
+  "American Club",
+  "The London P&I Club"
+ ],
+ "builders": {
+  "bulk": [
+   "Oshima Shipbuilding (JP)",
+   "Tsuneishi Zhoushan (CN)",
+   "Imabari Shipbuilding (JP)",
+   "Jiangsu New Yangzi (CN)",
+   "Hyundai Mipo (KR)",
+   "COSCO Zhoushan (CN)"
+  ],
+  "tanker": [
+   "Hyundai Mipo (KR)",
+   "Samsung HI (KR)",
+   "DSME (KR)",
+   "Sumitomo HI (JP)",
+   "New Times Shipbuilding (CN)",
+   "STX Offshore (KR)"
+  ],
+  "container": [
+   "Hyundai HI (KR)",
+   "Samsung HI (KR)",
+   "Jiangsu New Yangzi (CN)",
+   "CSBC (TW)"
+  ],
+  "gas": [
+   "Hudong-Zhonghua (CN)",
+   "Samsung HI (KR)",
+   "Hyundai HI (KR)",
+   "Kawasaki HI (JP)"
+  ],
+  "other": [
+   "Volgograd Shipyard (RU)",
+   "Sefine Shipyard (TR)",
+   "Damen (NL)",
+   "Nevskiy Shipyard (RU)",
+   "Hanjin (KR)"
+  ]
+ },
+ "companies": {
+  "A": [
+   [
+    "Pontus Maritime Ltd",
+    "Limassol"
+   ],
+   [
+    "Dobrogea Shipping SA",
+    "Constanța"
+   ],
+   [
+    "Hazar Denizcilik AŞ",
+    "Istanbul"
+   ],
+   [
+    "Meridian Bulk Carriers SA",
+    "Piraeus"
+   ],
+   [
+    "Karadeniz Lines Ltd",
+    "Valletta"
+   ],
+   [
+    "Aegean Dawn Maritime Inc",
+    "Majuro"
+   ],
+   [
+    "Boreas Ship Management",
+    "Athens"
+   ],
+   [
+    "Thracian Navigation Co",
+    "Varna"
+   ],
+   [
+    "Colchis Shipping LLC",
+    "Batumi"
+   ]
+  ],
+  "B": [
+   [
+    "Gulf Crescent Shipping LLC",
+    "Dubai"
+   ],
+   [
+    "Al Batinah Marine SAOC",
+    "Sohar"
+   ],
+   [
+    "Oryx Tankers DMCC",
+    "Dubai"
+   ],
+   [
+    "Pearl Gulf Navigation",
+    "Doha"
+   ],
+   [
+    "Tigris Freight Lines",
+    "Basra"
+   ],
+   [
+    "Dhofar Maritime LLC",
+    "Salalah"
+   ],
+   [
+    "Fenix Ship Management",
+    "Singapore"
+   ],
+   [
+    "Arabian Horizon Shipping",
+    "Abu Dhabi"
+   ],
+   [
+    "Sindh Bulk Carriers",
+    "Mumbai"
+   ]
+  ]
+ },
+ "opaque": [
+  [
+   "Sunrise Maritime Inc",
+   "Majuro"
+  ],
+  [
+   "Golden Wave Shipping Ltd",
+   "Road Town"
+  ],
+  [
+   "Blue Lagoon Marine Corp",
+   "Majuro"
+  ],
+  [
+   "Starlight Vessels Ltd",
+   "Hong Kong"
+  ],
+  [
+   "Seabird Holdings SA",
+   "Panama City"
+  ]
+ ]
+}

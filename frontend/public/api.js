@@ -1,0 +1,33 @@
+/* =====================================================================================
+   Data source switch. `mock` runs the whole pipeline in the browser (no backend, no credits);
+   `server` asks the FastAPI backend, which returns the same JSON shapes the browser builds itself.
+   Open the app with ?source=server (or set window.VVT_CONFIG.source) to use the backend.
+   ===================================================================================== */
+'use strict';
+const API = {
+  cfg: window.VVT_CONFIG || { source: 'mock', apiBase: '' },
+  get server() { return this.cfg.source === 'server'; },
+  async get(path) {
+    const r = await fetch(this.cfg.apiBase + path, { headers: { Accept: 'application/json' } });
+    if (!r.ok) { let d = ''; try { d = (await r.json()).detail || ''; } catch (e) {} throw new Error(`${r.status} ${path} ${d}`); }
+    return r.json();
+  },
+  search(q) { return this.get('/api/vessels/search?q=' + encodeURIComponent(q)); },
+  analysis(imo) { return this.get(`/api/vessels/${imo}/analysis`); },
+  fleet() { return this.get('/api/fleet'); },
+  region(id) { return this.get(`/api/regions/${id}/vessels`); },
+  rules() { return this.get('/api/rules'); },
+  reportUrl(imo) { return `${this.cfg.apiBase}/api/vessels/${imo}/report`; },
+
+  /* Rehydrate a server analysis into the object shape core.js produces, so every screen works unchanged. */
+  hydrate(j) {
+    const v = j.vessel; v.history = v.history || []; v.sanctions = v.sanctions || []; v.exNames = v.exNames || [];
+    const track = j.track || [];
+    const calls = (j.portCalls || []).map(pc => ({ ...pc, port: { ...pc.port, b: pc.port.b } }));
+    const voyages = (j.voyages || []).map(vg => ({ ...vg, from: vg.from ? calls.find(c => c.arrive === vg.from.arrive) || vg.from : null, to: vg.to ? calls.find(c => c.arrive === vg.to.arrive) || vg.to : null, pts: track.slice(vg.i0, vg.i1 + 1), flags: [] }));
+    const flags = (j.flags || []).map(f => { const fl = { ...f, vessel: v, vesselLevel: f.vesselLevel, voyage: f.voyage ? voyages.find(x => x.n === f.voyage) : null }; if (fl.voyage) fl.voyage.flags.push(fl); if (f.partnerImo) fl.partner = { name: (f.lines[1] || '').split(' · ')[0], imo: f.partnerImo }; return fl; });
+    const st = j.status || { state: 'moored' };
+    return { v, track, portCalls: calls, voyages, flags, sev: j.sev || { high: 0, medium: 0, info: 0 }, last: j.last || track[track.length - 1], stats: j.stats || {},
+      static: { state: st.state, destination: st.destination, eta: st.eta, since: st.since, port: st.port, lastPort: st.lastPort, nextPort: st.nextPort } };
+  },
+};

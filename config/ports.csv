@@ -1,0 +1,69 @@
+id,name,country,region,berth_lon,berth_lat,approach_lon,approach_lat,kinds,major,zone,anch_lon,anch_lat,anch_radius_nm
+ODS,Odesa,UA,A,30.74,46.48,30.9,46.35,"bulk,container",1,,30.95,46.3,5
+CHO,Chornomorsk,UA,A,30.65,46.3,30.85,46.22,"bulk,container",0,,,,
+PIV,Pivdennyi,UA,A,31.0,46.62,31.1,46.45,bulk,0,,,,
+CND,Constanța,RO,A,28.65,44.17,28.85,44.15,any,1,,28.85,44.08,5
+VAR,Varna,BG,A,27.92,43.19,28.15,43.19,"bulk,container",0,,,,
+BOJ,Burgas,BG,A,27.48,42.49,27.75,42.5,"tanker,bulk",0,,,,
+NVS,Novorossiysk,RU,A,37.78,44.72,37.75,44.6,any,1,,37.7,44.55,6
+TUA,Tuapse,RU,A,39.07,44.1,39.0,44.02,tanker,0,,,,
+TAM,Taman,RU,A,36.72,45.12,36.8,44.98,"tanker,bulk",0,,,,
+KAV,Port Kavkaz,RU,A,36.68,45.35,36.6,45.08,any,0,,,,
+SEV,Sevastopol,Crimea,A,33.52,44.61,33.35,44.6,any,1,crimea,,,
+FEO,Feodosia,Crimea,A,35.39,45.03,35.45,44.92,any,0,crimea,,,
+KER,Kerch,Crimea,A,36.47,45.35,36.58,45.25,any,0,crimea,,,
+BER,Berdyansk,occupied UA,A,36.78,46.75,36.85,46.58,bulk,0,azov,,,
+MAR,Mariupol,occupied UA,A,37.55,47.09,37.6,46.95,bulk,0,azov,,,
+SAM,Samsun,TR,A,36.35,41.3,36.4,41.42,"bulk,container",0,,,,
+TRA,Trabzon,TR,A,39.74,41.0,39.7,41.12,bulk,0,,,,
+BAT,Batumi,GE,A,41.65,41.65,41.5,41.68,"tanker,bulk",0,,,,
+POT,Poti,GE,A,41.65,42.15,41.45,42.15,"bulk,container",0,,,,
+SPS,Supsa,GE,A,41.72,42.0,41.45,41.98,tanker,0,,,,
+AMB,Ambarlı,TR,A,28.68,40.97,28.7,40.9,"container,tanker",1,,28.95,40.93,4
+IZT,İzmit,TR,A,29.92,40.76,29.6,40.74,tanker,0,,,,
+GEM,Gemlik,TR,A,29.12,40.43,28.95,40.43,container,0,,,,
+BND,Bandırma,TR,A,27.97,40.37,27.95,40.5,bulk,0,,,,
+MER,Mersin,TR,A,34.63,36.78,34.7,36.68,any,1,,34.75,36.65,4
+ISK,İskenderun,TR,A,36.17,36.6,35.95,36.65,"bulk,tanker",0,,,,
+CEY,Ceyhan,TR,A,35.85,36.85,35.85,36.72,tanker,0,,,,
+LAT,Latakia,SY,A,35.78,35.52,35.65,35.5,any,0,syria,,,
+TAR,Tartus,SY,A,35.87,34.89,35.72,34.88,tanker,1,syria,,,
+ALY,Alexandria,EG,A,29.87,31.19,29.85,31.32,any,1,,29.8,31.38,4
+DAM,Damietta,EG,A,31.76,31.47,31.75,31.62,"bulk,container",0,,,,
+PSD,Port Said,EG,A,32.3,31.26,32.32,31.4,container,1,,,,
+LIM,Limassol,CY,A,33.04,34.65,33.05,34.52,container,0,,,,
+HAI,Haifa,IL,A,35.0,32.82,34.9,32.85,"container,bulk",0,,,,
+PIR,Piraeus,GR,A,23.63,37.94,23.6,37.85,container,1,,,,
+JEA,Jebel Ali,AE,B,55.06,25.01,54.95,25.15,"container,bulk,tanker",1,,54.8,25.2,6
+DXB,Port Rashid,AE,B,55.28,25.27,55.22,25.4,any,0,,,,
+SHJ,Sharjah,AE,B,55.38,25.37,55.3,25.5,"bulk,container",0,,,,
+KHL,Khalifa Port,AE,B,54.65,24.8,54.62,25.0,"container,bulk",1,,,,
+RUW,Ruwais,AE,B,52.73,24.13,52.75,24.45,"tanker,gas",0,,,,
+DAS,Das Island,AE,B,52.87,25.15,52.95,25.3,"tanker,gas",0,,,,
+FJR,Fujairah,AE,B,56.36,25.17,56.52,25.18,"tanker,any",1,,56.6,25.22,8
+KHF,Khor Fakkan,AE,B,56.36,25.35,56.5,25.36,container,0,,,,
+SOH,Sohar,OM,B,56.63,24.5,56.8,24.55,any,1,,56.85,24.48,5
+MCT,Muscat,OM,B,58.57,23.63,58.6,23.75,"container,bulk",1,,,,
+DUQ,Duqm,OM,B,57.7,19.67,57.9,19.7,"tanker,bulk",0,,,,
+SLL,Salalah,OM,B,54.0,16.94,54.02,16.82,"container,bulk",1,,54.1,16.8,5
+KHS,Khasab,OM,B,56.25,26.2,56.22,26.32,any,0,,,,
+BND2,Bandar Abbas,IR,B,56.2,27.15,56.36,27.08,any,1,iran,56.38,27.0,3
+BUZ,Bushehr,IR,B,50.84,28.97,50.7,28.85,"bulk,container",0,iran,,,
+KHK,Kharg Island,IR,B,50.32,29.23,50.2,29.1,tanker,1,iran,,,
+BIK,Bandar Imam Khomeini,IR,B,49.08,30.43,49.3,29.9,bulk,0,iran,,,
+ASA,Asaluyeh,IR,B,52.62,27.47,52.6,27.25,"gas,tanker",0,iran,,,
+LEN,Bandar Lengeh,IR,B,54.88,26.55,54.9,26.42,any,0,iran,,,
+CHB,Chabahar,IR,B,60.62,25.3,60.62,25.12,"bulk,container",0,iran,,,
+JSK,Jask,IR,B,57.77,25.65,57.8,25.5,tanker,0,iran,,,
+RTA,Ras Tanura,SA,B,50.16,26.64,50.35,26.7,tanker,1,,50.45,26.75,5
+JUB,Jubail,SA,B,49.66,27.03,49.85,27.1,"tanker,bulk",0,,,,
+DMM,Dammam,SA,B,50.1,26.43,50.4,26.5,"container,bulk",0,,,,
+KWI,Shuwaikh,KW,B,47.93,29.35,48.25,29.42,"container,bulk",0,,,,
+MAA,Mina Al Ahmadi,KW,B,48.17,29.07,48.35,29.1,tanker,0,,,,
+UMQ,Umm Qasr,IQ,B,47.93,30.03,48.15,29.8,"bulk,container",0,,,,
+BOT,Basra Oil Terminal,IQ,B,48.8,29.68,48.95,29.6,tanker,1,,,,
+RLF,Ras Laffan,QA,B,51.57,25.92,51.8,26.0,"gas,tanker",1,,,,
+HMD,Hamad Port,QA,B,51.6,25.03,51.85,25.05,"container,bulk",0,,,,
+MES,Mesaieed,QA,B,51.55,24.98,51.85,24.9,"gas,tanker",0,,,,
+BAH,Khalifa Bin Salman,BH,B,50.66,26.16,50.9,26.25,"container,bulk",0,,,,
+GWD,Gwadar,PK,B,62.33,25.12,62.3,24.95,"bulk,container",0,,,,

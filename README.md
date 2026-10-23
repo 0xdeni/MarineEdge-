@@ -1,0 +1,48 @@
+# MarineEdge
+
+Vessel due diligence for grain, oilseed, vegetable-oil and dry-bulk desks working the Black Sea, the Strait of Hormuz and the Gulf. Type a name or IMO, see twelve months of voyages on one chart, every red flag with its evidence, and export a PDF report.
+
+Mobile-first PWA (installs on a phone, works offline) + FastAPI/PostGIS backend + a rule engine with seven red-flag rules. Read `docs/BRIEF.md` for the full specification and `docs/STATUS.md` for where things stand.
+
+## Run it in two minutes (no API key)
+
+```bash
+cd backend
+pip install -e ".[dev]"                 # or: pip install fastapi "uvicorn[standard]" pyyaml jinja2 requests playwright
+VVT_PROVIDER=mock uvicorn app.main:app --reload --port 8000
+# in another shell
+cd frontend/public && python3 -m http.server 8080
+```
+
+Open `http://localhost:8080/?source=server` (backend) or `http://localhost:8080/` (everything in the browser). Any email signs in to the demo. Sample fleet of 40 fictional vessels with generated tracks; `HORMUZ QUEEN`, `KUBAN SPIRIT` and `LEVANT STAR` are the interesting ones.
+
+Full stack with PostGIS: `cp .env.example .env && docker compose up --build`, then `http://localhost:8080`.
+
+## Tests
+
+```bash
+cd backend && pytest -q          # or: python -m tests.run
+```
+
+19 engine tests on synthetic tracks: clean, port calls, anchorage merge, voyages, and each of the seven rules (positive and negative cases).
+
+## Switching to a real AIS provider
+
+Put the key in `.env`, set `VVT_PROVIDER=datalastic` (or `kpler` once the adapter is filled in), restart. Nothing else changes; see `docs/PROVIDERS.md` for the trial checklist and the first-pull sanity checks.
+
+## API
+
+| Route | What |
+|---|---|
+| `GET /api/health` | provider, rules, zones |
+| `GET /api/vessels/search?q=` | name, IMO or MMSI → candidates |
+| `GET /api/vessels/{imo}` | particulars |
+| `GET /api/vessels/{imo}/analysis` | track, port calls, voyages, flags, status (cached fetch) |
+| `GET /api/regions/{blacksea,hormuz,iran,oman,uae}/vessels` | live positions in the region |
+| `POST /api/vessels/{imo}/report?fmt=pdf` | PDF report |
+| `GET /api/rules` · `POST /api/rules/reload` | thresholds from `config/rules.yaml` |
+| `POST /api/zones/{id}` `{enabled}` | toggle a sensitive zone |
+
+## Layout
+
+See `CLAUDE.md`.

@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#F2F2F7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="MarineEdge">
+<meta name="description" content="Vessel due diligence for the Black Sea, Hormuz, Iran, Oman and the UAE: twelve months of voyages on one chart, every red flag with its evidence.">
+<title>MarineEdge</title>
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400..700;1,400..700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="./styles.css">
+<script>window.VVT_CONFIG = { source: new URLSearchParams(location.search).get("source") || "mock", apiBase: "" };</script>
+</head>
+<body>
+<div class="app" id="app">
+  <main class="pages">
+    <section class="page" id="page-chart">
+      <div class="stage" id="stage">
+        <canvas id="map" aria-label="Chart"></canvas>
+        <div class="mapui">
+          <div class="regions glass" id="regions" role="tablist" aria-label="Regions"></div>
+          <div class="zstack glass"><button id="zin" aria-label="Zoom in"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button><button id="zout" aria-label="Zoom out"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 12h14"/></svg></button><button id="zfit" aria-label="Fit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="6"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg></button></div>
+          <div class="readout"><div class="bar" id="scalebar"><i style="--w:60px"></i><span id="scaletxt">50 nm</span></div><span id="coords">44°43.0′N 037°46.0′E</span></div>
+          <div class="loading glass" id="loading">Loading sample fleet…</div>
+        </div>
+      </div>
+      <section class="sheet glass" id="sheet" aria-label="Details">
+        <div class="grab" id="grab"><span></span></div>
+        <div class="sheet-head" id="sheetHead">
+          <div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><input id="q" type="search" autocomplete="off" spellcheck="false" placeholder="Vessel name, IMO or MMSI" aria-label="Search vessel"><button class="clear" id="qclear" hidden aria-label="Clear search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+        </div>
+        <div class="sheet-body" id="sheetBody"></div>
+      </section>
+    </section>
+    <section class="page scroll" id="page-vessels" hidden></section>
+    <section class="page scroll" id="page-alerts" hidden></section>
+    <section class="page scroll" id="page-reports" hidden></section>
+    <section class="page scroll" id="page-profile" hidden></section>
+  </main>
+  <nav class="tabbar glass" id="tabbar" aria-label="Sections"></nav>
+</div>
+<div class="login" id="login" hidden></div>
+<div class="report" id="report" hidden></div>
+<script src="./geo.js"></script>
+<script src="./core.js"></script>
+<script src="./api.js"></script>
+<script src="./app.js"></script>
+<script>
+if ("serviceWorker" in navigator) { window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js").catch(() => {})); }
+</script>
+</body>
+</html>

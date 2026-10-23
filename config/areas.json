@@ -1,0 +1,89 @@
+{
+ "jamming": [
+  {
+   "name": "Black Sea",
+   "box": [
+    27.0,
+    40.5,
+    42.0,
+    47.5
+   ]
+  },
+  {
+   "name": "Eastern Mediterranean",
+   "box": [
+    25.0,
+    30.5,
+    37.0,
+    37.2
+   ]
+  },
+  {
+   "name": "Gulf / Hormuz",
+   "box": [
+    47.0,
+    22.0,
+    63.0,
+    31.0
+   ]
+  }
+ ],
+ "sts_areas": [
+  {
+   "name": "Off Taman (Kerch approaches)",
+   "lonlat": [
+    36.95,
+    44.8
+   ]
+  },
+  {
+   "name": "Off Sevastopol",
+   "lonlat": [
+    33.1,
+    44.7
+   ]
+  },
+  {
+   "name": "East of Cyprus",
+   "lonlat": [
+    34.4,
+    34.9
+   ]
+  },
+  {
+   "name": "Off Alexandria OPL",
+   "lonlat": [
+    29.7,
+    31.7
+   ]
+  },
+  {
+   "name": "Gulf of Oman (OPL Fujairah east)",
+   "lonlat": [
+    56.95,
+    25.0
+   ]
+  },
+  {
+   "name": "Off Khor Fakkan",
+   "lonlat": [
+    56.7,
+    25.5
+   ]
+  },
+  {
+   "name": "Off Hormuz east",
+   "lonlat": [
+    57.4,
+    25.75
+   ]
+  },
+  {
+   "name": "Off Sohar",
+   "lonlat": [
+    56.95,
+    24.4
+   ]
+  }
+ ]
+}
