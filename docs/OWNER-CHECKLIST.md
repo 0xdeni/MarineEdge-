@@ -29,7 +29,12 @@ Two routes; do B0 tonight regardless, it costs nothing and history starts the mo
 
 ## D. Before wider rollout
 
-- [ ] **D0. Turn on GitHub Actions (2 taps, do it now).** In Safari: github.com/0xdeni/MarineEdge- › **Actions** tab. If it offers "I understand my workflows, go ahead and enable them", tap it. From then on every push builds the Docker images, boots the whole stack and runs 38 tests against a real PostGIS — a green tick means a server install will work; a red cross I see and fix without you. (If the tab already shows runs, nothing to do.)
+- [ ] **D0. Unblock GitHub Actions (3 taps).** Actions is on, but every run dies before it starts ("startup_failure"), even a one-line test workflow, so the cause is your account or repo settings, not the code. In Safari: github.com/0xdeni/MarineEdge- › **Actions** › tap the top run and read the banner:
+  - "…recent account payments have failed or your spending limit needs to be increased" → github.com/settings/billing › **Spending limits** › Actions: allow a small amount (e.g. $5) or fix the card. Private repos get 2,000 free minutes a month, so the bill stays $0; the limit just has to exist.
+  - "…is not allowed to be used in…" → repo **Settings › Actions › General › Allow all actions and reusable workflows**.
+  - "Your account has been flagged" → tap the support link in the banner (new accounts sometimes get this automatically).
+  - Alternative that avoids all three: make the repo **public** (Settings › General › Danger zone) — Actions is then free and unrestricted. Nothing secret is in the repo (keys live only on the server), but it is your call.
+  Once fixed, every push builds the Docker images, boots the whole stack and runs 38 tests against a real PostGIS: a green tick means a server install will work; a red cross I see and fix without you.
 
 - [ ] **D1. Domain.** Buy or pick a subdomain (tracker.yourcompany.com), add an A record to the server IP, then tell me; the server switches to it with one setting change.
 - [ ] **D2. Company login.** Google Workspace or Microsoft? I add SSO in front of the app; until then each user gets a token (ask me, I add it).
