@@ -162,8 +162,9 @@ def test_live_prune_tiers():
     now = int(_t.time() * 1000)
     day, minute = 86_400_000, 60_000
     rows = []
-    for i in range(30):                                        # 60 days old: 30 fixes 2 min apart → one per 15 min = 4 kept
-        rows.append({"mmsi": 1, "t": now - 60 * day + i * 2 * minute, "lat": 41.0, "lon": 29.0, "sog": 10.0, "cog": 0.0, "heading": None, "nav": 0, "draught": None, "imo": None})
+    old_start = (now - 60 * day) // (15 * minute) * (15 * minute)   # aligned to a 15-min bucket so the count is deterministic
+    for i in range(30):                                        # 60 days old: 30 fixes 2 min apart over 58 min → 4 buckets kept
+        rows.append({"mmsi": 1, "t": old_start + i * 2 * minute, "lat": 41.0, "lon": 29.0, "sog": 10.0, "cog": 0.0, "heading": None, "nav": 0, "draught": None, "imo": None})
     for i in range(10):                                        # yesterday: full resolution kept
         rows.append({"mmsi": 1, "t": now - day + i * 2 * minute, "lat": 41.0, "lon": 29.0, "sog": 10.0, "cog": 0.0, "heading": None, "nav": 0, "draught": None, "imo": None})
     rows.append({"mmsi": 1, "t": now - 500 * day, "lat": 41.0, "lon": 29.0, "sog": 0.0, "cog": 0.0, "heading": None, "nav": 1, "draught": None, "imo": None})   # beyond retention
