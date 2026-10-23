@@ -16,6 +16,11 @@ Phone-only operation: the AIS provider and its key, the connection test, the fir
 
 Beyond the brief: iOS-style PWA shell (glass tab bar and sheet), login, Vessels/Alerts/Reports/Profile pages, Settings that edit rules, zones, provider, appearance, map tiles; watchlist refresh job that turns new flags into alerts and Web Push notifications; server-side watchlist and notes per user; World Port Index importer; dependency-free dev server; marketing landing page on a design canvas.
 
+## UI/UX state (reviewed 23 Oct at iPhone 15 size, every screen, light and dark)
+
+Done: iOS-style shell (glass tab bar, bottom sheet with search, large titles, grouped settings), login, chart with regions/zones/ports/ships, vessel sheet (voyages · flags with evidence and "show on chart" · identity history · sanctions · particulars), voyage detail with analyst note, alerts feed, reports page and in-app report, profile + settings (provider, rules, zones, appearance, notifications, about), admin screens. Polish pass this night: transparent top bar until scroll, seamless schematic chart when zoomed out, zone labels kept on screen, flags ordered by severity, KPI typography, empty-state CTA. The prototype link is now built from the repo's frontend (same code as production), so it stays in sync.
+Open: MapLibre tiles and pinch gestures unverified on a real phone (needs the server); a proper app icon and wordmark (placeholder glyph now); onboarding/empty states for a brand-new server (no ships recorded yet); desktop layout is functional but not designed; marketing site exists only as a design canvas, not as pages.
+
 ## Decisions taken
 
 - **Product name: MarineEdge** (repo `0xdeni/MarineEdge-`). The brief's "Vessel Voyage Tracker" stays only inside `docs/BRIEF.md`.

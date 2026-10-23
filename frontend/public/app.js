@@ -242,7 +242,7 @@ function passFilter(a) { if (S.type !== 'all' && a.v.type !== S.type) return fal
 function isDark() { const t = document.documentElement.getAttribute('data-theme'); return t === 'dark' || (!t && matchMedia('(prefers-color-scheme: dark)').matches); }
 function startBase() {
   const stage = $('#stage'), el = $('#basemap');
-  if (!SET.baseMap || !el) return;
+  if (!SET.baseMap || !el || (API.cfg && API.cfg.noTiles)) return;   // noTiles: hosts whose sandbox blocks tile fetches (the prototype link)
   const ok = Base.init(el, {
     onReady() { stage.classList.add('tiles'); $('#attrib').hidden = false; Chart.draw(); },
     onFail() { stage.classList.remove('tiles'); $('#attrib').hidden = true; $('#map').style.pointerEvents = ''; wireGestures($('#map')); Chart.fitBounds(REGIONS[S.region].bounds, false); },
