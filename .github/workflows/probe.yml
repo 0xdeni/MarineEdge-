@@ -1,0 +1,8 @@
+# Temporary: finds out why every run ends in startup_failure (no marketplace actions used here)
+name: probe
+on: [push]
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "runner works"; uname -a
