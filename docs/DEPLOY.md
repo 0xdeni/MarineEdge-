@@ -10,9 +10,10 @@ Hetzner Cloud (recommended, ~€4–8/month), DigitalOcean, Vultr or Scaleway al
 
 1. Open `deploy/cloud-init.yaml` on GitHub, tap Raw, select all, copy.
 2. In the provider's "create server" screen pick **Ubuntu 24.04**, the smallest 2 vCPU / 4 GB size, any EU location.
-3. Find the **cloud-init / user data** field, paste the file, and edit two lines inside it:
+3. Find the **cloud-init / user data** field, paste the file, and edit the lines inside it:
    - `ADMIN_TOKEN=` → a long passphrase of your choice (this is your sign-in password)
    - `DOMAIN=` → leave empty for now (you get `https://<ip>.sslip.io` with a real certificate), or your own domain once its A record points at the server
+   - `GITHUB_TOKEN=` → only while the repository is private: a fine-grained personal access token for this one repository with Contents: Read-only. A public repository needs nothing here.
 4. Create the server. Note its IPv4 address.
 
 Five minutes later: `https://<ip with dashes>.sslip.io` (example: IP 95.217.12.34 → `https://95-217-12-34.sslip.io`). Sign in with any email and the ADMIN_TOKEN.

@@ -41,6 +41,8 @@ See `docs/OWNER-CHECKLIST.md`. Shortest version: create a server with the cloud-
 
 ## Known gaps
 
+- The repository is private, so a fresh server cannot download the code anonymously. The installer now takes an optional read-only `GITHUB_TOKEN` (fine-grained PAT) from the cloud-init file and stores it in the clone's remote so auto-update works; making the repository public is the simpler route (checklist A0).
+
 - aisstream.io message field names follow their public docs and sample payloads; the recorder logs any message it cannot parse, and the parser is unit-tested on those shapes. First hour on a real key confirms them.
 - Global Fishing Watch v3 endpoint and dataset names are from the public docs, unverified; the cross-check reports per-dataset errors instead of failing.
 - The recorder is a second container on the same image; it idles (logs a warning every 60 s) until a key exists, so a server without a key wastes nothing. Volume policy (one fix per ship per 2 min, cargo/tanker only once known, 30 days full resolution then 15-min, 14-month retention via the daily `prune-live` job) keeps PostGIS near 15 GB/year; the first week of real traffic will show whether the estimate holds.

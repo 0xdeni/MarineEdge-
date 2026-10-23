@@ -1,15 +1,18 @@
 #cloud-config
-# MarineEdge · one-paste server setup for Ubuntu 24.04 (Hetzner, DigitalOcean, Vultr, Scaleway: paste as
-# "cloud-init / user data" when creating the server). Edit the three values under "content:" first.
+# MarineEdge · one-paste server setup for Ubuntu 24.04 (Hetzner, DigitalOcean, Vultr, Scaleway, Oracle Always Free:
+# paste as "cloud-init / user data" when creating the server). Edit the values under "content:" first.
 #
-#   ADMIN_TOKEN  the password you will sign in with (long, no spaces). Leave empty to get a random one
-#                written to /opt/marineedge/.env and /var/log/marineedge-install.log on the server.
-#   DOMAIN       tracker.yourcompany.com (A record → the server's IP), or leave empty to get
-#                https://<ip>.sslip.io with a real certificate and no domain purchase.
-#   AUTO_UPDATE  1 = pull every new commit from GitHub within 10 minutes (good while we build; set 0 later)
+#   ADMIN_TOKEN   the password you will sign in with (long, no spaces). Leave empty to get a random one
+#                 written to /opt/marineedge/.env and /var/log/marineedge-install.log on the server.
+#   DOMAIN        tracker.yourcompany.com (A record → the server's IP), or leave empty to get
+#                 https://<ip>.sslip.io with a real certificate and no domain purchase.
+#   AUTO_UPDATE   1 = pull every new commit from GitHub within 10 minutes, test it on the server, deploy if green
+#   GITHUB_TOKEN  ONLY if the GitHub repository is private: a fine-grained personal access token for this one
+#                 repository with "Contents: Read-only" (github.com › Settings › Developer settings › Fine-grained
+#                 tokens). Leave empty when the repository is public.
 #
 # Five minutes after the server boots, open https://<DOMAIN> on the phone, sign in with any email and the
-# ADMIN_TOKEN, then Profile › AIS provider to paste the Datalastic key.
+# ADMIN_TOKEN, then Profile › AIS provider to paste the aisstream.io (free) or Datalastic key.
 write_files:
   - path: /opt/marineedge-setup.env
     permissions: "0600"
@@ -17,9 +20,23 @@ write_files:
       ADMIN_TOKEN=
       DOMAIN=
       AUTO_UPDATE=1
+      GITHUB_TOKEN=
       PROVIDER=mock
       DATALASTIC_API_KEY=
+  - path: /opt/marineedge-bootstrap.sh
+    permissions: "0700"
+    content: |
+      #!/usr/bin/env bash
+      # fetches deploy/install.sh from GitHub (with the token when the repository is private) and runs it
+      set -euo pipefail
+      set -a; . /opt/marineedge-setup.env; set +a
+      URL=https://raw.githubusercontent.com/0xdeni/MarineEdge-/main/deploy/install.sh
+      if [ -n "${GITHUB_TOKEN:-}" ]; then
+        curl -fsSL -H "Authorization: token ${GITHUB_TOKEN}" "$URL" | bash
+      else
+        curl -fsSL "$URL" | bash || echo "== could not fetch install.sh: if the repository is private, set GITHUB_TOKEN in /opt/marineedge-setup.env, or make it public" | tee -a /var/log/marineedge-install.log
+      fi
 package_update: true
 packages: [curl, git]
 runcmd:
-  - [bash, -c, "curl -fsSL https://raw.githubusercontent.com/0xdeni/MarineEdge-/main/deploy/install.sh | bash"]
+  - [bash, /opt/marineedge-bootstrap.sh]

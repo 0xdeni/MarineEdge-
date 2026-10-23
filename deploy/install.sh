@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # MarineEdge one-shot server install. Runs from cloud-init (deploy/cloud-init.yaml) or by hand:
 #   curl -fsSL https://raw.githubusercontent.com/0xdeni/MarineEdge-/main/deploy/install.sh | sudo bash
-# Reads /opt/marineedge-setup.env if present (ADMIN_TOKEN, DOMAIN, AUTO_UPDATE, PROVIDER, DATALASTIC_API_KEY).
+# Reads /opt/marineedge-setup.env if present (ADMIN_TOKEN, DOMAIN, AUTO_UPDATE, GITHUB_TOKEN, PROVIDER, DATALASTIC_API_KEY).
+# GITHUB_TOKEN (fine-grained, Contents: read) is only needed while the repository is private; it is stored in
+# the clone's remote URL so the auto-updater can fetch.
 # Idempotent: re-running updates the code and restarts the stack without touching .env.
 set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
@@ -13,10 +15,13 @@ exec > >(tee -a "$LOG") 2>&1
 echo "== MarineEdge install $(date -u +%FT%TZ)"
 
 # 1. Settings from the cloud-init file (if any)
-ADMIN_TOKEN=""; DOMAIN=""; AUTO_UPDATE="1"; PROVIDER="mock"; DATALASTIC_API_KEY=""
+ADMIN_TOKEN=""; DOMAIN=""; AUTO_UPDATE="1"; GITHUB_TOKEN=""; PROVIDER="mock"; DATALASTIC_API_KEY=""
 if [ -f "$SETUP_ENV" ]; then
   # shellcheck disable=SC1090
   set -a; . "$SETUP_ENV"; set +a
+fi
+if [ -n "$GITHUB_TOKEN" ]; then
+  REPO="https://x-access-token:${GITHUB_TOKEN}@github.com/0xdeni/MarineEdge-.git"
 fi
 
 # 2. Docker
@@ -46,9 +51,14 @@ fi
 
 # 3. Code
 if [ -d "$DIR/.git" ]; then
+  [ -n "$GITHUB_TOKEN" ] && git -C "$DIR" remote set-url origin "$REPO"
   git -C "$DIR" pull -q --ff-only
 else
-  git clone -q "$REPO" "$DIR"
+  if ! git clone -q "$REPO" "$DIR" 2>/tmp/clone.err; then
+    sed "s#${GITHUB_TOKEN:-__none__}#***#g" /tmp/clone.err
+    echo "== clone failed. If the GitHub repository is private, put a fine-grained token (Contents: Read-only) in GITHUB_TOKEN= in $SETUP_ENV and re-run; or make the repository public."
+    exit 1
+  fi
 fi
 cd "$DIR"
 
