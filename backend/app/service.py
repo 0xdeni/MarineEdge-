@@ -24,6 +24,7 @@ class Service:
         self.store = store or make_store()
         self.provider = provider or make_provider(ref=self.ref) if provider is None and _is_mock() else (provider or make_provider())
         self.now = now_ms
+        self.fetches = 0
         self._cache: dict[int, Analysis] = {}
 
     # ---- helpers ----
@@ -46,14 +47,20 @@ class Service:
 
     # ---- steps 3-8 ----
     def track(self, imo: int) -> list[Position]:
-        """Step 3 with the cache rule: fetch a window only once."""
+        """Step 3 with the cache rule: a window is fetched once. On later calls only the uncovered tail
+        (from the last fetched moment, with one hour of overlap, to now) is bought."""
         end = self._now()
         start = end - int(self.rules.history_months * 30.4 * 24 * 3_600_000)
         if self.store.covered(imo, start, end):
             return self.store.get_positions(imo, start, end)
-        pts = self.provider.get_track(imo, start, end)
+        last = self.store.latest_window_end(imo)
+        fetch_from = start if last is None or last < start else max(start, last - 3_600_000)
+        if end - fetch_from < 15 * 60_000:                       # nothing new to buy yet
+            return self.store.get_positions(imo, start, end)
+        pts = self.provider.get_track(imo, fetch_from, end)
         credits = getattr(self.provider, "last_credits", 5)
-        self.store.put_positions(imo, pts, getattr(self.provider, "name", "provider"), start, end, credits)
+        self.store.put_positions(imo, pts, getattr(self.provider, "name", "provider"), fetch_from, end, credits)
+        self.fetches += 1
         return self.store.get_positions(imo, start, end) or pts
 
     def analysis(self, imo: int, refresh: bool = False) -> Analysis:

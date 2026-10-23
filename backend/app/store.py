@@ -11,11 +11,40 @@ from app.engine.types import Analysis, Position
 
 
 class Store(Protocol):
+    # positions (the cache rule)
     def covered(self, imo: int, start_ms: int, end_ms: int) -> bool: ...
+    def latest_window_end(self, imo: int) -> Optional[int]: ...
     def get_positions(self, imo: int, start_ms: int, end_ms: int) -> list[Position]: ...
     def put_positions(self, imo: int, pts: list[Position], provider: str, start_ms: int, end_ms: int, credits: int) -> None: ...
     def save_analysis(self, a: Analysis) -> None: ...
     def list_sanctions(self, imo: int) -> list[dict]: ...
+    # per-user state
+    def user_id(self, name: str) -> int: ...
+    def get_watchlist(self, user: str) -> list[int]: ...
+    def set_watchlist(self, user: str, imos: list[int]) -> None: ...
+    def all_watched(self) -> list[int]: ...
+    def get_notes(self, user: str, imo: int) -> dict[str, str]: ...
+    def set_note(self, user: str, imo: int, voyage_n: int, text: str) -> None: ...
+    # alerts & push
+    def add_alert(self, imo: int, rule: str, t0_ms: int, severity: str, title: str, detail: str) -> bool: ...
+    def list_alerts(self, since_ms: int, limit: int = 200) -> list[dict]: ...
+    def add_push_subscription(self, user: str, sub: dict, user_agent: str) -> None: ...
+    def remove_push_subscription(self, endpoint: str) -> None: ...
+    def list_push_subscriptions(self, users: Optional[list[str]] = None) -> list[dict]: ...
+
+
+def _chain_covers(windows: list[tuple[int, int]], start_ms: int, end_ms: int, slack_ms: int = 6 * 3_600_000) -> bool:
+    """True when fetched windows, joined end to end (1 h overlap allowed), span [start, end - slack]."""
+    reach = None
+    for a, b in sorted(windows):
+        if reach is None:
+            if a <= start_ms:
+                reach = b
+        elif a <= reach + 3_600_000:
+            reach = max(reach, b)
+        if reach is not None and reach >= end_ms - slack_ms:
+            return True
+    return False
 
 
 class MemoryStore:
@@ -23,9 +52,17 @@ class MemoryStore:
         self.pos: dict[int, dict[int, Position]] = {}
         self.windows: dict[int, list[tuple[int, int]]] = {}
         self.sanctions: dict[int, list[dict]] = {}
+        self.watch: dict[str, list[int]] = {}
+        self.notes: dict[tuple[str, int], dict[str, str]] = {}
+        self.alerts: dict[tuple[int, str, int], dict] = {}
+        self.subs: dict[str, dict] = {}
 
     def covered(self, imo, start_ms, end_ms):
-        return any(a <= start_ms and b >= end_ms - 6 * 3_600_000 for a, b in self.windows.get(imo, []))
+        return _chain_covers(self.windows.get(imo, []), start_ms, end_ms)
+
+    def latest_window_end(self, imo):
+        w = self.windows.get(imo)
+        return max(b for _, b in w) if w else None
 
     def get_positions(self, imo, start_ms, end_ms):
         return sorted((p for p in self.pos.get(imo, {}).values() if start_ms <= p.t <= end_ms), key=lambda p: p.t)
@@ -41,6 +78,47 @@ class MemoryStore:
 
     def list_sanctions(self, imo):
         return self.sanctions.get(imo, [])
+
+    def user_id(self, name):
+        return abs(hash(name)) % 10_000_000
+
+    def get_watchlist(self, user):
+        return list(self.watch.get(user, []))
+
+    def set_watchlist(self, user, imos):
+        self.watch[user] = sorted(set(int(i) for i in imos))
+
+    def all_watched(self):
+        return sorted({i for v in self.watch.values() for i in v})
+
+    def get_notes(self, user, imo):
+        return dict(self.notes.get((user, imo), {}))
+
+    def set_note(self, user, imo, voyage_n, text):
+        d = self.notes.setdefault((user, imo), {})
+        if text.strip():
+            d[str(voyage_n)] = text
+        else:
+            d.pop(str(voyage_n), None)
+
+    def add_alert(self, imo, rule, t0_ms, severity, title, detail):
+        key = (imo, rule, t0_ms // 3_600_000)
+        if key in self.alerts:
+            return False
+        self.alerts[key] = {"imo": imo, "rule": rule, "t0": t0_ms, "severity": severity, "title": title, "detail": detail, "created_at": int(__import__("time").time() * 1000)}
+        return True
+
+    def list_alerts(self, since_ms, limit=200):
+        return sorted((a for a in self.alerts.values() if a["created_at"] >= since_ms), key=lambda a: -a["created_at"])[:limit]
+
+    def add_push_subscription(self, user, sub, user_agent):
+        self.subs[sub["endpoint"]] = {"user": user, "sub": sub, "user_agent": user_agent}
+
+    def remove_push_subscription(self, endpoint):
+        self.subs.pop(endpoint, None)
+
+    def list_push_subscriptions(self, users=None):
+        return [v for v in self.subs.values() if users is None or v["user"] in users]
 
 
 class PostgresStore:
@@ -60,9 +138,13 @@ class PostgresStore:
 
     def covered(self, imo, start_ms, end_ms):
         with self._conn() as c:
-            row = c.execute("SELECT 1 FROM fetch_log WHERE imo=%s AND window_from<=%s AND window_to>=%s LIMIT 1",
-                            (imo, self._ts(start_ms), self._ts(end_ms - 6 * 3_600_000))).fetchone()
-        return row is not None
+            rows = c.execute("SELECT window_from, window_to FROM fetch_log WHERE imo=%s ORDER BY window_from", (imo,)).fetchall()
+        return _chain_covers([(int(a.timestamp() * 1000), int(b.timestamp() * 1000)) for a, b in rows], start_ms, end_ms)
+
+    def latest_window_end(self, imo):
+        with self._conn() as c:
+            row = c.execute("SELECT max(window_to) FROM fetch_log WHERE imo=%s", (imo,)).fetchone()
+        return int(row[0].timestamp() * 1000) if row and row[0] else None
 
     def get_positions(self, imo, start_ms, end_ms):
         with self._conn() as c:
@@ -121,6 +203,85 @@ class PostgresStore:
         with self._conn() as c:
             rows = c.execute("SELECT list_name, programme, listed_at FROM sanctions WHERE imo=%s AND delisted_at IS NULL", (imo,)).fetchall()
         return [{"list": r[0], "programme": r[1] or "", "t": int(datetime(r[2].year, r[2].month, r[2].day, tzinfo=timezone.utc).timestamp() * 1000)} for r in rows if r[2]]
+
+    # ---- per-user state (users.email holds the token name until SSO maps real emails)
+    def user_id(self, name):
+        with self._conn() as c:
+            row = c.execute("INSERT INTO users (email, name) VALUES (%s, %s) ON CONFLICT (email) DO UPDATE SET email=EXCLUDED.email RETURNING id", (name, name)).fetchone()
+            c.commit()
+        return row[0]
+
+    def get_watchlist(self, user):
+        uid = self.user_id(user)
+        with self._conn() as c:
+            rows = c.execute("SELECT imo FROM watchlist WHERE user_id=%s ORDER BY added_at", (uid,)).fetchall()
+        return [r[0] for r in rows]
+
+    def set_watchlist(self, user, imos):
+        uid = self.user_id(user)
+        with self._conn() as c:
+            with c.cursor() as cur:
+                cur.execute("DELETE FROM watchlist WHERE user_id=%s AND NOT (imo = ANY(%s))", (uid, list(imos) or [0]))
+                for imo in imos:
+                    cur.execute("INSERT INTO vessels (imo, name) VALUES (%s, %s) ON CONFLICT DO NOTHING", (imo, str(imo)))
+                    cur.execute("INSERT INTO watchlist (user_id, imo) VALUES (%s, %s) ON CONFLICT DO NOTHING", (uid, imo))
+            c.commit()
+
+    def all_watched(self):
+        with self._conn() as c:
+            rows = c.execute("SELECT DISTINCT imo FROM watchlist ORDER BY imo").fetchall()
+        return [r[0] for r in rows]
+
+    def get_notes(self, user, imo):
+        uid = self.user_id(user)
+        with self._conn() as c:
+            rows = c.execute("SELECT voyage_n, text FROM notes WHERE user_id=%s AND imo=%s", (uid, imo)).fetchall()
+        return {str(r[0]): r[1] for r in rows}
+
+    def set_note(self, user, imo, voyage_n, text):
+        uid = self.user_id(user)
+        with self._conn() as c:
+            with c.cursor() as cur:
+                cur.execute("DELETE FROM notes WHERE user_id=%s AND imo=%s AND voyage_n=%s", (uid, imo, voyage_n))
+                if text.strip():
+                    cur.execute("INSERT INTO notes (user_id, imo, voyage_n, text) VALUES (%s,%s,%s,%s)", (uid, imo, voyage_n, text))
+            c.commit()
+
+    # ---- alerts & push
+    def add_alert(self, imo, rule, t0_ms, severity, title, detail):
+        hour = self._ts(t0_ms - t0_ms % 3_600_000)
+        with self._conn() as c:
+            row = c.execute("INSERT INTO alerts (imo, rule, t0_hour, severity, title, detail) VALUES (%s,%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING RETURNING id",
+                            (imo, rule, hour, severity, title, detail)).fetchone()
+            c.commit()
+        return row is not None
+
+    def list_alerts(self, since_ms, limit=200):
+        with self._conn() as c:
+            rows = c.execute("SELECT imo, rule, t0_hour, severity, title, detail, created_at FROM alerts WHERE created_at >= %s ORDER BY created_at DESC LIMIT %s",
+                             (self._ts(since_ms), limit)).fetchall()
+        return [{"imo": r[0], "rule": r[1], "t0": int(r[2].timestamp() * 1000), "severity": r[3], "title": r[4], "detail": r[5], "created_at": int(r[6].timestamp() * 1000)} for r in rows]
+
+    def add_push_subscription(self, user, sub, user_agent):
+        uid = self.user_id(user)
+        keys = sub.get("keys", {})
+        with self._conn() as c:
+            c.execute("INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth, user_agent) VALUES (%s,%s,%s,%s,%s) "
+                      "ON CONFLICT (endpoint) DO UPDATE SET p256dh=EXCLUDED.p256dh, auth=EXCLUDED.auth, failed_at=NULL", (uid, sub["endpoint"], keys.get("p256dh", ""), keys.get("auth", ""), user_agent))
+            c.commit()
+
+    def remove_push_subscription(self, endpoint):
+        with self._conn() as c:
+            c.execute("DELETE FROM push_subscriptions WHERE endpoint=%s", (endpoint,))
+            c.commit()
+
+    def list_push_subscriptions(self, users=None):
+        with self._conn() as c:
+            if users is None:
+                rows = c.execute("SELECT u.email, s.endpoint, s.p256dh, s.auth FROM push_subscriptions s JOIN users u ON u.id=s.user_id WHERE s.failed_at IS NULL").fetchall()
+            else:
+                rows = c.execute("SELECT u.email, s.endpoint, s.p256dh, s.auth FROM push_subscriptions s JOIN users u ON u.id=s.user_id WHERE s.failed_at IS NULL AND u.email = ANY(%s)", (list(users),)).fetchall()
+        return [{"user": r[0], "sub": {"endpoint": r[1], "keys": {"p256dh": r[2], "auth": r[3]}}} for r in rows]
 
 
 def make_store() -> Store:

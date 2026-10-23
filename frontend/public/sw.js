@@ -1,6 +1,6 @@
 /* Service worker: app shell cached for offline use, API responses network-first with a cache fallback,
    so the last analysed vessels still open on a phone with no signal. Bump VERSION on every deploy. */
-const VERSION = 'marineedge-v0.3.0';
+const VERSION = 'marineedge-v0.4.0';
 const SHELL = ['./', './index.html', './styles.css', './geo.js', './base.js', './core.js', './api.js', './app.js', './manifest.webmanifest', './icons/icon.svg'];
 
 self.addEventListener('install', e => {
@@ -20,4 +20,14 @@ self.addEventListener('fetch', e => {
   if (url.hostname.includes('openfreemap.org')) return;  // tiles: network only, never cached by us
   if (url.hostname.includes('fonts.g') || url.hostname.includes('jsdelivr')) { e.respondWith(caches.match(e.request).then(r => r || fetch(e.request).then(res => { const copy = res.clone(); caches.open(VERSION + '-fonts').then(c => c.put(e.request, copy)); return res; }).catch(() => new Response('', { status: 204 })))); return; }
   e.respondWith(caches.match(e.request).then(r => r || fetch(e.request)));
+});
+
+self.addEventListener('push', e => {
+  let d = {}; try { d = e.data ? e.data.json() : {}; } catch (err) { d = { title: 'MarineEdge', body: e.data && e.data.text() }; }
+  e.waitUntil(self.registration.showNotification(d.title || 'MarineEdge', { body: d.body || '', tag: d.tag, icon: './icons/icon-192.png', badge: './icons/icon-192.png', data: { url: d.url || './' } }));
+});
+self.addEventListener('notificationclick', e => {
+  e.notification.close();
+  const target = new URL((e.notification.data && e.notification.data.url) || './', self.registration.scope).href;
+  e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => { for (const c of list) { if ('focus' in c) { c.navigate(target); return c.focus(); } } return self.clients.openWindow(target); }));
 });

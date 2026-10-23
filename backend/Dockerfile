@@ -1,7 +1,7 @@
 FROM mcr.microsoft.com/playwright/python:v1.47.0-jammy
 WORKDIR /srv
 COPY backend/pyproject.toml ./
-RUN pip install --no-cache-dir -e . 2>/dev/null || pip install --no-cache-dir fastapi "uvicorn[standard]" pydantic requests pyyaml jinja2 "psycopg[binary]" playwright
+RUN pip install --no-cache-dir -e . 2>/dev/null || pip install --no-cache-dir fastapi "uvicorn[standard]" pydantic requests pyyaml jinja2 "psycopg[binary]" playwright pywebpush
 COPY backend/app ./app
 COPY backend/migrations ./migrations
 COPY config /config

@@ -15,6 +15,18 @@ const API = {
     if (!r.ok) { let d = ''; try { d = (await r.json()).detail || ''; } catch (e) {} throw new Error(`${r.status} ${path} ${d}`); }
     return r.json();
   },
+  async send(method, path, body) {
+    const r = await fetch(this.cfg.apiBase + path, { method, headers: { ...this.headers(), 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) });
+    if (!r.ok) throw new Error(`${r.status} ${path}`);
+    return r.status === 204 ? null : r.json();
+  },
+  me() { return this.get('/api/me'); },
+  putWatchlist(imos) { return this.send('PUT', '/api/me/watchlist', { imos }); },
+  notes(imo) { return this.get(`/api/me/notes/${imo}`); },
+  putNote(imo, n, text) { return this.send('PUT', `/api/me/notes/${imo}/${n}`, { text }); },
+  alerts(days = 14) { return this.get(`/api/alerts?days=${days}`); },
+  pushSubscribe(sub) { return this.send('POST', '/api/push/subscribe', sub); },
+  pushUnsubscribe(sub) { return this.send('DELETE', '/api/push/subscribe', sub); },
   search(q) { return this.get('/api/vessels/search?q=' + encodeURIComponent(q)); },
   analysis(imo) { return this.get(`/api/vessels/${imo}/analysis`); },
   fleet() { return this.get('/api/fleet'); },

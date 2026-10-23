@@ -178,6 +178,8 @@ CREATE TABLE IF NOT EXISTS notes (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+CREATE UNIQUE INDEX IF NOT EXISTS idx_notes_user_voyage ON notes(user_id, imo, voyage_n);
+
 CREATE TABLE IF NOT EXISTS reports (
   id         BIGSERIAL PRIMARY KEY,
   imo        INTEGER NOT NULL,

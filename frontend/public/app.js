@@ -366,7 +366,7 @@ function showPage(p) {
   document.querySelectorAll('#tabbar .tab').forEach(t => t.setAttribute('aria-selected', t.dataset.page === p));
   $('#tabbar').classList.toggle('hide', p === 'chart' && Sheet.pos === 'full' && isMobile());
   if (p === 'chart') { Chart.resize(); } else renderPage(p);
-  if (p === 'alerts') { store.set('alertsSeen', NOW); updateBadge(); }
+  if (p === 'alerts') { store.set('alertsSeen', NOW); updateBadge(); if (API.server) API.alerts().then(list => { S.serverAlerts = list; renderPage('alerts'); }).catch(() => {}); }
   try { history.replaceState(null, '', '#' + (p === 'chart' && S.imo && S.mode !== 'region' ? 'imo' + S.imo : p === 'chart' ? S.region : p)); } catch (e) {}
 }
 function openVessel(imo) {
@@ -382,7 +382,7 @@ function openVessel(imo) {
   renderSheet(); Sheet.snap('half'); $('#sheetBody').scrollTop = 0;
   Chart.fitBounds(boundsOf(a.track)); try { history.replaceState(null, '', '#imo' + imo); } catch (e) {}
 }
-function openVoyage(n, scroll = true) { S.mode = 'voyage'; S.voyage = n; S.focusFlag = null; renderSheet(); if (scroll) $('#sheetBody').scrollTop = 0; Sheet.snap('half'); const a = ANALYSIS.get(S.imo), vg = a.voyages.find(x => x.n === n); if (vg) Chart.fitBounds(boundsOf(vg.pts)); else Chart.draw(); }
+function openVoyage(n, scroll = true) { S.mode = 'voyage'; S.voyage = n; S.focusFlag = null; if (API.server) API.notes(S.imo).then(ns => { const all = store.get('notes', {}); for (const [k, t] of Object.entries(ns)) all[S.imo + '-' + k] = t; store.set('notes', all); const el = document.getElementById('note'); if (el && ns[String(n)] !== undefined && !el.value) el.value = ns[String(n)]; }).catch(() => {}); renderSheet(); if (scroll) $('#sheetBody').scrollTop = 0; Sheet.snap('half'); const a = ANALYSIS.get(S.imo), vg = a.voyages.find(x => x.n === n); if (vg) Chart.fitBounds(boundsOf(vg.pts)); else Chart.draw(); }
 function focusFlag(f, scroll = true, snapTo = 'half') {
   if (S.imo !== f.vessel.imo) { S.imo = f.vessel.imo; S.mode = 'vessel'; S.voyage = null; S.vtab = 'flags'; }
   S.focusFlag = f.id; if (f.voyage && S.mode === 'voyage') S.voyage = f.voyage.n;
@@ -394,7 +394,7 @@ function focusFlag(f, scroll = true, snapTo = 'half') {
 function backToRegion() { S.mode = S.query ? 'search' : 'region'; S.voyage = null; S.focusFlag = null; renderSheet(); Chart.fitBounds(REGIONS[S.region].bounds); try { history.replaceState(null, '', '#' + S.region); } catch (e) {} }
 function setRegion(key) { S.region = key; syncRegions(); if (S.mode === 'vessel' || S.mode === 'voyage') { S.mode = 'region'; S.voyage = null; } S.query = ''; $('#q').value = ''; $('#qclear').hidden = true; if (S.mode === 'search') S.mode = 'region'; Chart.fitBounds(REGIONS[key].bounds); renderSheet(); try { history.replaceState(null, '', '#' + key); } catch (e) {} }
 function syncRegions() { document.querySelectorAll('#regions .rchip').forEach(c => c.setAttribute('aria-pressed', c.dataset.region === S.region)); }
-function toggleWatch(imo) { const w = watchlist(); const i = w.indexOf(imo); if (i >= 0) w.splice(i, 1); else w.push(imo); store.set('watch', w); toast(i >= 0 ? 'Removed from watchlist' : 'Added to watchlist'); }
+function toggleWatch(imo) { const w = watchlist(); const i = w.indexOf(imo); if (i >= 0) w.splice(i, 1); else w.push(imo); store.set('watch', w); toast(i >= 0 ? 'Removed from watchlist' : 'Added to watchlist'); if (API.server) API.putWatchlist(w).catch(() => toast('Watchlist not saved on the server')); }
 function providerLabel() { if (API.server) return 'Server · ' + (API.cfg.providerName || 'configured provider'); return { mock: 'Mock AIS provider (generated tracks)', kpler: 'Kpler / MarineTraffic API', spire: 'Kpler / Spire Maritime', datalastic: 'Datalastic', vesselfinder: 'VesselFinder API' }[SET.provider] || 'Mock AIS provider'; }
 function saveSettings() { store.set('settings', SET); }
 function applyAppearance() {
@@ -426,6 +426,7 @@ function renderVesselsPage() {
 }
 function alertsList() {
   const out = [];
+  if (API.server && S.serverAlerts) for (const al of S.serverAlerts) { const a = ANALYSIS.get(al.imo); const f = a && a.flags.find(f => f.rule === al.rule && Math.abs(f.t0 - al.t0) < 3600e3); out.push({ t: al.created_at, sev: al.severity, title: al.title, sub: `${al.rule} · refresh job`, f, a }); }
   for (const a of LIVE) for (const f of a.flags) { const t = f.t1 || f.t0; if (t >= NOW - 14 * D) out.push({ t, sev: f.severity, title: f.title, sub: `${a.v.name} · ${f.rule}${watched(a.v.imo) ? ' · watched' : ''}`, f, a }); }
   for (const a of LIVE) for (const s of a.v.sanctions) if (s.t >= NOW - 240 * D) out.push({ t: s.t, sev: 'high', title: `${a.v.name} added to ${s.list}`, sub: `${s.programme} · list refresh`, f: a.flags.find(f => f.rule === 'Sanctions hit'), a });
   out.push({ t: NOW - 2 * H, sev: 'sys', title: 'Sanctions lists refreshed', sub: 'OFAC SDN, EU and UK consolidated lists · no new fleet matches', sys: true });
@@ -488,6 +489,7 @@ function renderProfilePage() {
     <div class="gh">Time</div><div class="group"><div class="grow"><div class="lbl"><b>Show times in local time</b><span>Default is UTC, as on the bridge</span></div>${sw('timeLocal', SET.timeLocal)}</div></div>
     <div class="gh">Accessibility</div><div class="group"><div class="grow"><div class="lbl"><b>Reduce transparency</b><span>Solid panels instead of glass</span></div>${sw('reduceTransparency', SET.reduceTransparency)}</div></div></div>`;
   if (pv === 'notify') return `${topbar('Notifications', back)}<div class="content"><h1 class="largetitle">Notifications</h1><p class="sub">What should reach your phone. Push delivery is part of the production build.</p>
+    ${API.server ? `<div class="gh">This device</div><div class="group"><button class="grow" data-act="push"><div class="lbl"><b style="color:var(--accent)">${S.pushOn ? 'Push notifications on · tap to turn off' : 'Enable push notifications on this device'}</b><span>${(S.push && S.push.configured) ? 'High flags on watched vessels, sent by the refresh job' : 'Server has no VAPID keys yet (see docs/DEPLOY.md)'}</span></div></button></div>` : ''}
     <div class="group"><div class="grow"><div class="lbl"><b>New flags on watched vessels</b></div>${sw('notify.flags', SET.notify.flags)}</div><div class="grow"><div class="lbl"><b>Sanctions list changes</b><span>OFAC, EU, UK · daily refresh</span></div>${sw('notify.sanctions', SET.notify.sanctions)}</div><div class="grow"><div class="lbl"><b>AIS gaps over ${RULES.aisGap.highHours} h</b></div>${sw('notify.gaps', SET.notify.gaps)}</div><div class="grow"><div class="lbl"><b>Daily digest</b><span>07:00 ${TZ()}</span></div>${sw('notify.digest', SET.notify.digest)}</div></div></div>`;
   if (pv === 'about') return `${topbar('About', back)}<div class="content"><h1 class="largetitle">About</h1>
     <div class="group">${grow('Version', 'Prototype 0.2 · sample data')}${grow('Fleet', FLEET.length + ' fictional vessels')}${grow('Chart', 'Schematic coastlines (MapLibre tiles in production)')}${grow('Rules', '7 rules · ' + RULE_LIST.map(r => r.name).join(', '))}</div>
@@ -495,6 +497,23 @@ function renderProfilePage() {
     <p class="gf">Every vessel is keyed on its IMO number. Every paid position is cached once. No scraping of provider websites. Draught-based flags are indicators, not proof.</p></div>`;
   return '';
 }
+
+/* ------------------------------------- web push ------------------------------------- */
+function b64ToU8(b64) { const pad = '='.repeat((4 - b64.length % 4) % 4); const raw = atob((b64 + pad).replace(/-/g, '+').replace(/_/g, '/')); return Uint8Array.from(raw, c => c.charCodeAt(0)); }
+async function togglePush() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) { toast('Push is not available in this browser'); return; }
+  const reg = await navigator.serviceWorker.ready;
+  const cur = await reg.pushManager.getSubscription();
+  if (cur) { await API.pushUnsubscribe(cur.toJSON()).catch(() => {}); await cur.unsubscribe(); S.pushOn = false; toast('Push notifications off'); renderPage('profile'); return; }
+  if (!(S.push && S.push.publicKey)) { toast('Server has no push keys yet'); return; }
+  const perm = await Notification.requestPermission();
+  if (perm !== 'granted') { toast('Notifications were not allowed'); return; }
+  try {
+    const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToU8(S.push.publicKey) });
+    await API.pushSubscribe(sub.toJSON()); S.pushOn = true; toast('Push notifications on'); renderPage('profile');
+  } catch (e) { toast('Could not subscribe: ' + e.message); }
+}
+async function checkPush() { try { if (!('serviceWorker' in navigator) || !('PushManager' in window)) return; const reg = await navigator.serviceWorker.ready; S.pushOn = !!(await reg.pushManager.getSubscription()); } catch (e) { /* no push */ } }
 
 /* ------------------------------------- login ------------------------------------- */
 function renderLogin() {
@@ -505,7 +524,7 @@ function renderLogin() {
   <button class="cap primary" type="submit">Sign in</button><button class="cap tint" type="button" data-act="passkey">Continue with a passkey</button>
   <div class="linkrow"><button type="button" data-act="forgot">Forgot password</button><button type="button" data-act="sso">Company SSO</button></div>
   <p style="font-size:12px">${API.server ? 'Enter the API token from your administrator. SSO replaces this on the company deployment.' : 'Demo sign-in: any email and password work. Production uses your identity provider; sessions never leave your server.'}</p></form>`;
-  el.querySelector('#loginForm').addEventListener('submit', e => { e.preventDefault(); const email = $('#lemail').value.trim() || 'analyst@example.com'; if (API.server) store.set('token', $('#lpass').value.trim()); signIn(email); if (API.server && !LIVE.length) loadFleet(() => { updateBadge(); renderSheet(); }); });
+  el.querySelector('#loginForm').addEventListener('submit', e => { e.preventDefault(); const email = $('#lemail').value.trim() || 'analyst@example.com'; if (API.server) store.set('token', $('#lpass').value.trim()); signIn(email); if (API.server && !LIVE.length && !S.loading) loadFleet(() => { updateBadge(); renderSheet(); }); });
   el.addEventListener('click', e => { const b = e.target.closest('[data-act]'); if (!b) return; if (b.dataset.act === 'passkey') signIn($('#lemail').value.trim() || 'analyst@example.com'); if (b.dataset.act === 'forgot') toast('Reset link would be emailed in production'); if (b.dataset.act === 'sso') toast('SSO redirect happens in production'); });
 }
 function signIn(email) {
@@ -578,7 +597,8 @@ function wireUI() {
     else if (act === 'watch') { toggleWatch(S.imo); renderSheet(); updateBadge(); }
     else if (act === 'report') { if (API.server) { toast('Generating PDF…'); fetch(API.reportUrl(S.imo), { method: 'POST', headers: API.headers() }).then(r => { if (!r.ok) throw new Error(r.status); return r.blob(); }).then(b => { const u = URL.createObjectURL(b); const a = document.createElement('a'); a.href = u; a.download = `marineedge-${S.imo}.pdf`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 10000); }).catch(err => toast('Report failed: ' + err.message)); } else openReport(); }
   });
-  $('#sheetBody').addEventListener('input', e => { if (e.target.id === 'note') { const n = store.get('notes', {}); n[S.imo + '-' + S.voyage] = e.target.value; store.set('notes', n); } });
+  let noteT = 0;
+  $('#sheetBody').addEventListener('input', e => { if (e.target.id === 'note') { const n = store.get('notes', {}); n[S.imo + '-' + S.voyage] = e.target.value; store.set('notes', n); if (API.server) { clearTimeout(noteT); const imo = S.imo, vn = S.voyage, text = e.target.value; noteT = setTimeout(() => API.putNote(imo, vn, text).catch(() => toast('Note not saved on the server')), 800); } } });
   $('#report').addEventListener('click', e => { const b = e.target.closest('[data-act]'); if (!b) return; if (b.dataset.act === 'closereport') { $('#report').hidden = true; if (S.page === 'reports') renderPage('reports'); } if (b.dataset.act === 'copyreport') copyReport(); });
   for (const p of ['vessels', 'alerts', 'reports', 'profile']) {
     const el = $('#page-' + p);
@@ -607,6 +627,7 @@ function pageAction(act, b) {
   else if (act === 'go-vessels') { S.vseg = 'watch'; showPage('vessels'); }
   else if (act === 'edit-name' || act === 'edit-org' || act === 'edit-role') { const u = store.get('user', {}); const key = act.slice(5); const cur = u[key] || ''; const el = b.querySelector('.val') || b.querySelector('.lbl'); el.innerHTML = `<input type="text" id="edit" value="${esc(cur)}" style="text-align:right;border:0;background:var(--fill);border-radius:8px;padding:4px 8px;width:160px;color:var(--fg)">`; const inp = el.querySelector('input'); inp.focus(); const done = () => { u[key] = inp.value.trim() || cur; store.set('user', u); renderPage('profile'); }; inp.addEventListener('blur', done, { once: true }); inp.addEventListener('keydown', e => { if (e.key === 'Enter') inp.blur(); }); }
   else if (act === 'cleardata') { ['watch', 'notes', 'reports', 'alertsSeen'].forEach(k => store.del(k)); toast('Local data cleared'); renderPage('profile'); updateBadge(); }
+  else if (act === 'push') togglePush();
   else if (act === 'signout') signOut();
   else if (act === 'provider') { SET.provider = b.dataset.id; saveSettings(); renderPage('profile'); toast(SET.provider === 'mock' ? 'Mock provider active' : providerLabel() + ' selected · needs a key and hosting'); }
   else if (act === 'testkey') toast(SET.provider === 'mock' ? 'Mock provider: OK · 0 credits used' : SET.apiKey ? 'This preview cannot reach outside APIs; test from the hosted build' : 'Paste an API key first');
@@ -625,7 +646,8 @@ function loadFleet(done) {
   let i = 0; const loading = $('#loading');
   if (API.server) {
     loading.hidden = false; loading.textContent = 'Loading fleet from server…';
-    API.fleet().then(list => { for (const j of list) { const a = API.hydrate(j); ANALYSIS.set(a.v.imo, a); BY_IMO[a.v.imo] = a.v; LIVE.push(a); } loading.hidden = true; S.loading = false; if (S.page === 'chart') { Chart.draw(); renderSheet(); } done(); })
+    API.me().then(me => { if (Array.isArray(me.watchlist)) store.set('watch', me.watchlist); S.push = me.push || {}; }).catch(() => {});
+    API.fleet().then(list => { for (const j of list) { const a = API.hydrate(j); ANALYSIS.set(a.v.imo, a); BY_IMO[a.v.imo] = a.v; const k = LIVE.findIndex(x => x.v.imo === a.v.imo); if (k >= 0) LIVE[k] = a; else LIVE.push(a); } loading.hidden = true; S.loading = false; if (S.page === 'chart') { Chart.draw(); renderSheet(); } done(); })
       .catch(err => { loading.textContent = 'Server unavailable: ' + err.message; console.error(err); });
     return;
   }
@@ -646,6 +668,7 @@ function boot() {
   if (REGIONS[hash]) S.region = hash; syncRegions();
   Chart.fitBounds(REGIONS[S.region].bounds, false); Sheet.snap('half'); renderSheet();
   if (!store.get('auth', null)) renderLogin();
+  checkPush();
   loadFleet(() => { updateBadge(); if (m && BY_IMO[+m[1]]) openVessel(+m[1]); else if (PAGES.includes(hash) && hash !== 'chart') showPage(hash); else renderSheet(); });
 }
 boot();

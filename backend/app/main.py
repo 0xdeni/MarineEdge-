@@ -6,11 +6,12 @@ import logging
 import os
 from typing import Optional
 
-from fastapi import Depends, FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 
+from app import push
 from app.auth import enabled as auth_enabled, require_token
 from app.providers.base import CreditsExhausted, ProviderError
 from app.service import Service, analysis_json, vessel_json
@@ -104,6 +105,71 @@ def report(imo: int, fmt: str = "pdf"):
         return HTMLResponse(html)
     path = render_pdf(html, imo)
     return FileResponse(path, media_type="application/pdf", filename=f"vvt-{imo}.pdf")
+
+
+# ---------------------------------------------------------------- per-user state (watchlist, notes, alerts, push)
+def _user(request: Request) -> str:
+    return getattr(request.state, "user", None) or "open"
+
+
+@app.get("/api/me")
+def me(request: Request):
+    u = _user(request)
+    return {"user": u, "watchlist": svc.store.get_watchlist(u), "push": {"configured": push.configured(), "publicKey": push.public_key()}}
+
+
+class Watchlist(BaseModel):
+    imos: list[int]
+
+
+@app.put("/api/me/watchlist")
+def put_watchlist(body: Watchlist, request: Request):
+    svc.store.set_watchlist(_user(request), body.imos)
+    return {"watchlist": svc.store.get_watchlist(_user(request))}
+
+
+@app.get("/api/me/notes/{imo}")
+def get_notes(imo: int, request: Request):
+    return svc.store.get_notes(_user(request), imo)
+
+
+class Note(BaseModel):
+    text: str
+
+
+@app.put("/api/me/notes/{imo}/{voyage_n}")
+def put_note(imo: int, voyage_n: int, body: Note, request: Request):
+    svc.store.set_note(_user(request), imo, voyage_n, body.text[:4000])
+    return svc.store.get_notes(_user(request), imo)
+
+
+@app.get("/api/alerts")
+def alerts(days: int = 14):
+    return svc.store.list_alerts(svc._now() - days * 24 * 3_600_000)
+
+
+class PushSub(BaseModel):
+    endpoint: str
+    keys: dict
+
+
+@app.post("/api/push/subscribe")
+def push_subscribe(body: PushSub, request: Request):
+    svc.store.add_push_subscription(_user(request), body.model_dump(), request.headers.get("user-agent", "")[:200])
+    return {"ok": True, "configured": push.configured()}
+
+
+@app.delete("/api/push/subscribe")
+def push_unsubscribe(body: PushSub):
+    svc.store.remove_push_subscription(body.endpoint)
+    return {"ok": True}
+
+
+@app.post("/api/jobs/refresh")
+def jobs_refresh(request: Request):
+    """Manual trigger of the watchlist refresh (the cron job calls app.jobs directly)."""
+    from app.jobs import refresh
+    return refresh(svc)
 
 
 @app.get("/api/fleet")
