@@ -1,6 +1,9 @@
 services:
   db:
-    image: postgis/postgis:16-3.4
+    # amd64: the official image. arm64 (Oracle Always Free Ampere, Raspberry Pi, Apple Silicon): the official
+    # image has no arm64 build, so install.sh sets POSTGIS_IMAGE=imresamu/postgis:16-3.4-bookworm (same Debian
+    # base and entrypoint, multi-arch) in .env. Never change this on a server that already has data.
+    image: "${POSTGIS_IMAGE:-postgis/postgis:16-3.4}"
     environment: { POSTGRES_DB: vvt, POSTGRES_USER: vvt, POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-vvt}" }
     volumes: [ "pgdata:/var/lib/postgresql/data", "./backend/migrations:/docker-entrypoint-initdb.d:ro" ]
     restart: unless-stopped

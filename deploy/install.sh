@@ -68,6 +68,12 @@ if [ -z "$DOMAIN" ]; then
   DOMAIN="$(echo "$IP" | tr . -).sslip.io"
 fi
 
+# 4b. CPU architecture: Arm servers need the multi-arch PostGIS image (official image is amd64 only)
+case "$(uname -m)" in
+  aarch64|arm64) POSTGIS_IMAGE="${POSTGIS_IMAGE:-imresamu/postgis:16-3.4-bookworm}"; echo "== arm64 detected: PostGIS image ${POSTGIS_IMAGE}" ;;
+  *) POSTGIS_IMAGE="${POSTGIS_IMAGE:-postgis/postgis:16-3.4}" ;;
+esac
+
 # 5. .env (created once; later runs keep it)
 if [ ! -f .env ]; then
   [ -n "$ADMIN_TOKEN" ] || ADMIN_TOKEN=$(tr -dc 'A-Za-z0-9' </dev/urandom | head -c 28)
