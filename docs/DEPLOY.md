@@ -28,6 +28,12 @@ Open https://YOUR.DOMAIN on the phone, "Add to Home Screen", sign in with your e
 - For company SSO, put oauth2-proxy (Google Workspace or Microsoft Entra) in front of Caddy's `web` handler and keep tokens for the CLI and cron. The frontend only needs the `Authorization` header to reach the API.
 - Never commit `.env`. Rotate a token by editing `.env` and `docker compose restart api`.
 
+## 4b. Push notifications
+```bash
+docker compose exec api python -m app.push keygen      # paste the three lines into .env, then docker compose restart api
+```
+On the phone: Profile › Notifications › Enable push notifications. The refresh job (every 30 min via cron) pushes new High flags on watched vessels. iOS needs the app added to the Home Screen first.
+
 ## 5. Updating
 ```bash
 cd /opt/marineedge && git pull && docker compose --profile prod up -d --build

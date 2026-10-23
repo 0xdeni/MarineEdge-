@@ -20,10 +20,11 @@ backend/app/store.py    MemoryStore | PostgresStore (PostGIS), fetch_log for the
 backend/app/service.py  orchestration + JSON shapes
 backend/app/main.py     FastAPI routes (token auth via app/auth.py when API_TOKENS is set)
 backend/app/cli.py      search · pull · report · region · fleet · first-pull · sanctions-refresh
+backend/app/jobs.py     refresh (watchlist → alerts → push) · sanctions · region; app/push.py (VAPID); app/devserver.py (stdlib dev server)
 backend/app/sanctions   OFAC/EU/UK loaders → sanctions table
 backend/app/reports     Jinja2 report → Playwright PDF
-backend/migrations      001_init.sql (PostGIS schema)
-backend/tests           synth.py + test_engine.py + test_sanctions.py (23 tests)
+backend/migrations      001_init.sql (PostGIS schema) · 002_alerts_push.sql
+backend/tests           synth.py + test_engine.py + test_sanctions.py + test_service.py + test_fleet.py (29 tests)
 frontend/public         index.html, styles.css, core.js (engine+mock), base.js (MapLibre), app.js (screens), api.js, sw.js, manifest
 config/                 rules.yaml, zones.geojson, ports.csv, areas.json
 docs/                   BRIEF.md, STATUS.md, PROVIDERS.md, ARCHITECTURE.md, DEPLOY.md, OWNER-CHECKLIST.md
@@ -33,4 +34,4 @@ deploy/                 Caddyfile, systemd unit, backup/restore, cron
 ## Commands
 
 - `make test` · `make lint` · `make demo` (sample PDF) · `docker compose up --build` (db + api + web on :8080)
-- Dev without Docker: `cd backend && VVT_PROVIDER=mock uvicorn app.main:app --reload`, then open `frontend/public/index.html?source=server` through any static server.
+- Dev without Docker: `cd backend && VVT_PROVIDER=mock uvicorn app.main:app --reload`, then open `frontend/public/index.html?source=server` through any static server; or `python -m app.devserver` (stdlib only) which serves both on :8080.

@@ -14,6 +14,8 @@ VVT_PROVIDER=mock uvicorn app.main:app --reload --port 8000
 cd frontend/public && python3 -m http.server 8080
 ```
 
+Or, with nothing installed but PyYAML: `cd backend && VVT_PROVIDER=mock python -m app.devserver` serves both on :8080.
+
 Open `http://localhost:8080/?source=server` (backend) or `http://localhost:8080/` (everything in the browser). Any email signs in to the demo. Sample fleet of 40 fictional vessels with generated tracks; `HORMUZ QUEEN`, `KUBAN SPIRIT` and `LEVANT STAR` are the interesting ones.
 
 Full stack with PostGIS: `cp .env.example .env && docker compose up --build`, then `http://localhost:8080`.
@@ -24,7 +26,7 @@ Full stack with PostGIS: `cp .env.example .env && docker compose up --build`, th
 cd backend && pytest -q          # or: python -m tests.run
 ```
 
-23 tests: 19 on synthetic tracks (clean, port calls, anchorage merge, voyages, each of the seven rules with positive and negative cases) and 4 on sanctions-list fixtures (OFAC, EU, UK, OpenSanctions).
+29 tests: 19 on synthetic tracks (clean, port calls, anchorage merge, voyages, each of the seven rules with positive and negative cases) 4 on sanctions-list fixtures (OFAC, EU, UK, OpenSanctions), 4 on the service layer (cache rule, incremental fetch, user state, alert de-duplication) and 2 regression tests on the generated fleet.
 
 ## Command line
 
@@ -51,6 +53,9 @@ Put the key in `.env`, set `VVT_PROVIDER=datalastic` (or `kpler` once the adapte
 | `GET /api/regions/{blacksea,hormuz,iran,oman,uae}/vessels` | live positions in the region |
 | `POST /api/vessels/{imo}/report?fmt=pdf` | PDF report |
 | `GET /api/rules` · `POST /api/rules/reload` | thresholds from `config/rules.yaml` |
+| `GET /api/me` · `PUT /api/me/watchlist` · `GET/PUT /api/me/notes/{imo}[/{n}]` | per-user watchlist and analyst notes |
+| `GET /api/alerts` · `POST /api/jobs/refresh` | alerts raised by the refresh job; manual trigger |
+| `POST/DELETE /api/push/subscribe` | Web Push subscriptions (VAPID) |
 | `POST /api/zones/{id}` `{enabled}` | toggle a sensitive zone |
 
 ## Deploy
