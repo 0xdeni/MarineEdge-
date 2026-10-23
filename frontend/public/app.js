@@ -46,6 +46,8 @@ const mY = lat => Math.log(Math.tan(Math.PI / 4 + lat * RAD / 2)) / RAD;
 const mLat = y => (2 * Math.atan(Math.exp(y * RAD)) - Math.PI / 2) / RAD;
 const LAND = {};
 for (const key of ['A', 'B']) LAND[key] = GEO.regions[key].land.map(ring => ({ pts: ring.map(([lon, lat]) => [lon, mY(lat)]), bbox: ring.reduce((b, [lon, lat]) => [Math.min(b[0], lon), Math.min(b[1], lat), Math.max(b[2], lon), Math.max(b[3], lat)], [999, 999, -999, -999]) }));
+const LAND_EXTENT = {};   // charted extent per region: the union of its land rings' bounding boxes
+for (const key of ['A', 'B']) LAND_EXTENT[key] = LAND[key].reduce((b, r) => [Math.min(b[0], r.bbox[0]), Math.min(b[1], r.bbox[1]), Math.max(b[2], r.bbox[2]), Math.max(b[3], r.bbox[3])], [999, 999, -999, -999]);
 const ZONES_M = GEO.zones.map(z => ({ z, pts: z.poly.map(([lon, lat]) => [lon, mY(lat)]), c: z.poly.reduce((a, p) => [a[0] + p[0] / z.poly.length, a[1] + p[1] / z.poly.length], [0, 0]) }));
 
 const Chart = {
@@ -81,18 +83,20 @@ const Chart = {
     if (view === this && Base.active) this.scale = Base.pxPerDegLon();
     ctx.setTransform(view.dpr, 0, 0, view.dpr, 0, 0);
     if (tiles) ctx.clearRect(0, 0, view.w, view.h); else { ctx.fillStyle = T.water; ctx.fillRect(0, 0, view.w, view.h); }
-    if (SET.graticule && !tiles) this.drawGraticule(ctx, view, T);
     if (!tiles) this.drawLand(ctx, view, T);
+    if (SET.graticule && !tiles) this.drawGraticule(ctx, view, T, false);
     this.drawZones(ctx, view, T);
     if (S.mode === 'vessel' || S.mode === 'voyage') this.drawVessel(ctx, view, T); else this.drawFleet(ctx, view, T);
     if (ctx === this.ctx) this.updateReadout();
   },
-  drawGraticule(ctx, view, T) {
+  drawGraticule(ctx, view, T, linesOnly) {
     const b = view.bounds(); const step = view.scale > 400 ? 0.5 : view.scale > 150 ? 1 : view.scale > 50 ? 2 : 5;
-    ctx.strokeStyle = T.grid; ctx.lineWidth = 1; ctx.beginPath();
-    for (let lon = Math.ceil(b[0] / step) * step; lon <= b[2]; lon += step) { const x = view.px(lon, 0)[0]; ctx.moveTo(x, 0); ctx.lineTo(x, view.h); }
-    for (let lat = Math.ceil(b[1] / step) * step; lat <= b[3]; lat += step) { const y = view.px(0, mY(lat))[1]; ctx.moveTo(0, y); ctx.lineTo(view.w, y); }
-    ctx.stroke();
+    if (linesOnly) {
+      ctx.strokeStyle = T.grid; ctx.lineWidth = 1; ctx.beginPath();
+      for (let lon = Math.ceil(b[0] / step) * step; lon <= b[2]; lon += step) { const x = view.px(lon, 0)[0]; ctx.moveTo(x, 0); ctx.lineTo(x, view.h); }
+      for (let lat = Math.ceil(b[1] / step) * step; lat <= b[3]; lat += step) { const y = view.px(0, mY(lat))[1]; ctx.moveTo(0, y); ctx.lineTo(view.w, y); }
+      ctx.stroke(); return;
+    }
     ctx.fillStyle = T.label; ctx.font = '10px ui-monospace, "IBM Plex Mono", monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
     for (let lon = Math.ceil(b[0] / step) * step; lon <= b[2]; lon += step) { const x = view.px(lon, 0)[0]; if (x > 40 && x < view.w - 40) ctx.fillText(`${Math.abs(lon)}°${lon >= 0 ? 'E' : 'W'}`, x, view.h - 16); }
     ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
@@ -100,17 +104,35 @@ const Chart = {
   },
   drawLand(ctx, view, T) {
     const b = view.bounds(); ctx.fillStyle = T.land; ctx.strokeStyle = T.coast; ctx.lineWidth = 1; ctx.lineJoin = 'round';
+    // beyond the charted extents the schematic has no coastline data; paint it as land (the regions are ringed by land)
+    // and re-open water inside each extent, so zooming out never shows a hard rectangle
+    ctx.fillRect(0, 0, view.w, view.h); ctx.fillStyle = T.water;
+    for (const key of ['A', 'B']) { const e = LAND_EXTENT[key]; const [x0, y0] = view.px(e[0], mY(e[3])); const [x1, y1] = view.px(e[2], mY(e[1])); ctx.fillRect(x0, y0, x1 - x0, y1 - y0); }
+    if (SET.graticule) this.drawGraticule(ctx, view, T, true);
+    ctx.fillStyle = T.land;
     for (const key of ['A', 'B']) for (const ring of LAND[key]) {
       if (ring.bbox[2] < b[0] || ring.bbox[0] > b[2] || ring.bbox[3] < b[1] || ring.bbox[1] > b[3]) continue;
       ctx.beginPath(); ring.pts.forEach(([lon, y], i) => { const [x, yy] = view.px(lon, y); i ? ctx.lineTo(x, yy) : ctx.moveTo(x, yy); }); ctx.closePath(); ctx.fill(); ctx.stroke();
     }
+    // the outer ring of each region closes along its extent; hide that seam under a land-coloured line
+    ctx.strokeStyle = T.land; ctx.lineWidth = 3;
+    for (const key of ['A', 'B']) { const e = LAND_EXTENT[key]; const [x0, y0] = view.px(e[0], mY(e[3])); const [x1, y1] = view.px(e[2], mY(e[1])); ctx.strokeRect(x0, y0, x1 - x0, y1 - y0); }
   },
   drawZones(ctx, view, T) {
     ctx.lineWidth = 1; ctx.setLineDash([4, 3]);
     for (const z of ZONES_M) {
       const off = z.z.enabled === false; ctx.fillStyle = off ? 'transparent' : T.zone; ctx.strokeStyle = T.zoneLine; ctx.globalAlpha = off ? 0.35 : 1;
       ctx.beginPath(); z.pts.forEach(([lon, y], i) => { const [x, yy] = view.px(lon, y); i ? ctx.lineTo(x, yy) : ctx.moveTo(x, yy); }); ctx.closePath(); if (!off) ctx.fill(); ctx.stroke();
-      if (view.scale > 30) { const [x, y] = view.project(z.c[0], z.c[1]); ctx.fillStyle = T.zoneLine; ctx.font = '600 10px -apple-system, "Instrument Sans", sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(z.z.name.toUpperCase() + (off ? ' · OFF' : ''), x, y); }
+      if (view.scale > 30) {
+        // label at the centre of the zone's visible part, so a zone cut by the screen edge keeps a readable label
+        let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9; z.pts.forEach(([lon, yy]) => { const [px, py] = view.px(lon, yy); x0 = Math.min(x0, px); y0 = Math.min(y0, py); x1 = Math.max(x1, px); y1 = Math.max(y1, py); });
+        const vx0 = Math.max(x0, 12), vy0 = Math.max(y0, 60), vx1 = Math.min(x1, view.w - 12), vy1 = Math.min(y1, view.h - 12);
+        if (vx1 - vx0 > 90 && vy1 - vy0 > 20) {
+          const text = z.z.name.toUpperCase() + (off ? ' · OFF' : ''); ctx.font = '600 10px -apple-system, "Instrument Sans", sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+          const tw = ctx.measureText(text).width; const cx = Math.min(Math.max((vx0 + vx1) / 2, vx0 + tw / 2 + 4), vx1 - tw / 2 - 4);
+          ctx.fillStyle = T.zoneLine; ctx.fillText(text, cx, (vy0 + vy1) / 2);
+        }
+      }
       ctx.globalAlpha = 1;
     }
     ctx.setLineDash([]);
@@ -330,7 +352,8 @@ function renderVessel() {
     body = `<ul class="rows">${a.voyages.slice().reverse().map(vg => { const fl = vg.flags.length; const when = vg.current ? `Left ${fmtD(vg.depart)} · ${fl ? fl + ' flag' + (fl > 1 ? 's' : '') : 'no flags yet'}` : `${fmtRange(vg.depart, vg.arrive)} · ${fl ? fl + ' flag' + (fl > 1 ? 's' : '') : 'no flags'}`;
       return `<li><button class="vrow" data-act="voyage" data-n="${vg.n}" aria-current="${S.voyage === vg.n}"><span class="vline" style="--c:var(--v${vg.color});--ls:${vg.current ? 'dashed' : 'solid'}"></span><div><b>V${vg.n}${vg.current ? ' · underway' : ''}</b><span class="route">${vg.from ? esc(vg.from.port.name) : 'History start'} → ${vg.to ? esc(vg.to.port.name) : esc(a.static.destination || '…')}</span><span class="meta ${fl ? 'fl' : ''}">${when}</span></div><span class="side">${fmtN(vg.nm)} nm<br>${vg.arrive ? fmtDur(vg.arrive - vg.depart) : fmtDur(NOW - vg.depart)}</span></button></li>`; }).join('')}</ul>`;
   } else if (S.vtab === 'flags') {
-    const fl = a.flags.slice().sort((x, y) => (y.vesselLevel - x.vesselLevel) || (y.t0 - x.t0)); body = fl.length ? fl.map(f => flagCard(f)).join('') : `<div class="empty">No red flags in the last 12 months.</div>`;
+    const rank = { high: 0, medium: 1, info: 2 };
+    const fl = a.flags.slice().sort((x, y) => ((rank[x.severity] ?? 3) - (rank[y.severity] ?? 3)) || ((y.vesselLevel ? 1 : 0) - (x.vesselLevel ? 1 : 0)) || (y.t0 - x.t0)); body = fl.length ? fl.map(f => flagCard(f)).join('') : `<div class="empty">No red flags in the last 12 months.</div>`;
     if (API.server) body += crossCheckPanel(v.imo);
   } else if (S.vtab === 'identity') {
     const hist = v.history.slice().sort((x, y) => y.t - x.t); const label = { name: 'Name', flag: 'Flag', mmsi: 'MMSI' };
@@ -431,7 +454,7 @@ function renderVesselsPage() {
   const segs = [['watch', `Watchlist (${watchlist().length})`], ['fleet', 'Fleet'], ['flagged', 'High flags']];
   let list = LIVE.slice(); if (S.vseg === 'watch') list = list.filter(a => watched(a.v.imo)); if (S.vseg === 'flagged') list = list.filter(a => a.sev.high);
   list.sort((x, y) => (y.sev.high - x.sev.high) || (y.flags.length - x.flags.length) || x.v.name.localeCompare(y.v.name));
-  const empty = S.vseg === 'watch' ? 'Your watchlist is empty. Open a vessel and tap Watch; its new flags will show under Alerts.' : 'Nothing here yet.';
+  const empty = S.vseg === 'watch' ? 'Your watchlist is empty. Open a vessel and tap Watch; its new flags will show under Alerts.<br><button class="cta" data-act="vseg" data-seg="fleet">Browse the fleet →</button>' : 'Nothing here yet.';
   return `${topbar('Vessels')}<div class="content"><h1 class="largetitle">Vessels</h1><p class="sub">${LIVE.length} vessels in the sample fleet · ${LIVE.filter(a => a.sev.high).length} with high flags</p>
   <div class="seg">${segs.map(([k, l]) => `<button data-act="vseg" data-seg="${k}" aria-pressed="${S.vseg === k}">${l}</button>`).join('')}</div>
   <div class="group"><ul class="rows">${list.map(a => vesselRow(a, ` · ${a.v.region === 'A' ? 'Black Sea' : 'Gulf'}`)).join('') || `<li class="empty">${empty}</li>`}</ul></div></div>`;
