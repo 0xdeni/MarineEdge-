@@ -22,7 +22,7 @@ const store = {
 };
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
 const isMobile = () => matchMedia('(max-width: 899px)').matches;
-const SET = Object.assign({ provider: 'mock', apiKey: '', theme: 'system', timeLocal: false, portLabels: true, graticule: true, reduceTransparency: false, notify: { flags: true, sanctions: true, digest: false, gaps: true }, zonesOff: [] }, store.get('settings', {}));
+const SET = Object.assign({ provider: 'mock', apiKey: '', theme: 'system', timeLocal: false, portLabels: true, graticule: true, reduceTransparency: false, notify: { flags: true, sanctions: true, digest: false, gaps: true }, zonesOff: [], baseMap: true }, store.get('settings', {}));
 const ICON = {
   chart: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" stroke-linecap="round"><path d="M3 6.5 9 4l6 2.5L21 4v13.5L15 20l-6-2.5L3 20z"/><path d="M9 4v13.5M15 6.5V20"/></svg>',
   vessels: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" stroke-linecap="round"><path d="M3 14h18l-2.5 5h-13z"/><path d="M6 14V9h12v5M10 9V5h4v4"/><path d="M2 19.5c2 1.5 4 1.5 6 0 2 1.5 4 1.5 6 0 2 1.5 4 1.5 6 0"/></svg>',
@@ -51,14 +51,17 @@ const ZONES_M = GEO.zones.map(z => ({ z, pts: z.poly.map(([lon, lat]) => [lon, m
 const Chart = {
   cv: null, ctx: null, w: 0, h: 0, dpr: 1, cx: 35, cy: mY(43.5), scale: 40, anim: null,
   init(canvas) { this.cv = canvas; this.ctx = canvas.getContext('2d'); new ResizeObserver(() => this.resize()).observe(canvas.parentElement); this.resize(); },
-  resize() { const r = this.cv.parentElement.getBoundingClientRect(); this.w = Math.max(1, r.width); this.h = Math.max(1, r.height); this.dpr = Math.min(2.5, devicePixelRatio || 1); this.cv.width = Math.round(this.w * this.dpr); this.cv.height = Math.round(this.h * this.dpr); this.draw(); },
+  resize() { const r = this.cv.parentElement.getBoundingClientRect(); this.w = Math.max(1, r.width); this.h = Math.max(1, r.height); this.dpr = Math.min(2.5, devicePixelRatio || 1); this.cv.width = Math.round(this.w * this.dpr); this.cv.height = Math.round(this.h * this.dpr); Base.resize(); this.draw(); },
   px(lon, y) { return [(lon - this.cx) * this.scale + this.w / 2, (this.cy - y) * this.scale + this.h / 2]; },
-  project(lon, lat) { return this.px(lon, mY(lat)); },
-  unproject(x, y) { return [this.cx + (x - this.w / 2) / this.scale, mLat(this.cy - (y - this.h / 2) / this.scale)]; },
-  bounds() { const a = this.unproject(0, this.h), b = this.unproject(this.w, 0); return [a[0], a[1], b[0], b[1]]; },
+  get base() { return Base.active && this === Chart; },
+  project(lon, lat) { return this.base ? Base.project(lon, lat) : this.px(lon, mY(lat)); },
+  unproject(x, y) { return this.base ? Base.unproject(x, y) : [this.cx + (x - this.w / 2) / this.scale, mLat(this.cy - (y - this.h / 2) / this.scale)]; },
+  bounds() { if (this.base) return Base.bounds(); const a = this.unproject(0, this.h), b = this.unproject(this.w, 0); return [a[0], a[1], b[0], b[1]]; },
   pad() { if (!isMobile()) return { t: 70, r: 470, b: 40, l: 90 }; const sh = Sheet.target ?? $('#sheet').getBoundingClientRect().height; return { t: 118, r: 20, b: Math.min(sh + 64 + 42, this.h * 0.62), l: 20 }; },
   fitBounds(b, animate = true) {
-    const p = this.pad(), W = Math.max(40, this.w - p.l - p.r), Hh = Math.max(40, this.h - p.t - p.b);
+    const p = this.pad();
+    if (this.base) { Base.fitBounds(b, p, animate && !reduceMotion.matches); return; }
+    const W = Math.max(40, this.w - p.l - p.r), Hh = Math.max(40, this.h - p.t - p.b);
     const y0 = mY(b[1]), y1 = mY(b[3]);
     const scale = Math.min(W / Math.max(0.01, b[2] - b[0]), Hh / Math.max(0.01, y1 - y0));
     const cx = (b[0] + b[2]) / 2 + ((p.r - p.l) / 2) / scale, cy = (y0 + y1) / 2 + ((p.t - p.b) / 2) / scale;
@@ -71,14 +74,15 @@ const Chart = {
     const step = now => { const k = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - k, 3); this.cx = s0.cx + (cx - s0.cx) * e; this.cy = s0.cy + (cy - s0.cy) * e; this.scale = s0.scale * Math.pow(scale / s0.scale, e); this.draw(); if (k < 1) this.anim = requestAnimationFrame(step); else onMoveEnd(); };
     this.anim = requestAnimationFrame(step);
   },
-  zoomAt(x, y, f) { const [lon, lat] = this.unproject(x, y); this.scale = Math.max(6, Math.min(3000, this.scale * f)); const [nx, ny] = this.project(lon, lat); this.cx += (nx - x) / this.scale; this.cy -= (ny - y) / this.scale; this.draw(); },
+  zoomAt(x, y, f) { if (this.base) { Base.zoomBy(f, [x, y]); return; } const [lon, lat] = this.unproject(x, y); this.scale = Math.max(6, Math.min(3000, this.scale * f)); const [nx, ny] = this.project(lon, lat); this.cx += (nx - x) / this.scale; this.cy -= (ny - y) / this.scale; this.draw(); },
   theme() { const c = getComputedStyle(document.documentElement); const g = n => c.getPropertyValue(n).trim(); return { water: g('--water'), land: g('--land'), coast: g('--coast'), grid: g('--grid'), label: g('--label'), zone: g('--zone'), zoneLine: g('--zone-line'), fg: g('--fg'), bg: g('--surface'), accent: g('--accent'), high: g('--high'), medium: g('--medium'), info: g('--info'), types: { tanker: g('--t-tanker'), bulk: g('--t-bulk'), container: g('--t-container'), gas: g('--t-gas'), other: g('--t-other') }, v: [0, 1, 2, 3, 4, 5, 6, 7].map(i => g('--v' + i)) }; },
   draw(ctx = this.ctx, view = this) {
-    const T = this.theme();
+    const T = this.theme(); const tiles = view === this && Base.active && Base.ready;
+    if (view === this && Base.active) this.scale = Base.pxPerDegLon();
     ctx.setTransform(view.dpr, 0, 0, view.dpr, 0, 0);
-    ctx.fillStyle = T.water; ctx.fillRect(0, 0, view.w, view.h);
-    if (SET.graticule) this.drawGraticule(ctx, view, T);
-    this.drawLand(ctx, view, T);
+    if (tiles) ctx.clearRect(0, 0, view.w, view.h); else { ctx.fillStyle = T.water; ctx.fillRect(0, 0, view.w, view.h); }
+    if (SET.graticule && !tiles) this.drawGraticule(ctx, view, T);
+    if (!tiles) this.drawLand(ctx, view, T);
     this.drawZones(ctx, view, T);
     if (S.mode === 'vessel' || S.mode === 'voyage') this.drawVessel(ctx, view, T); else this.drawFleet(ctx, view, T);
     if (ctx === this.ctx) this.updateReadout();
@@ -186,7 +190,7 @@ const Chart = {
   },
   updateReadout() {
     const [lon, lat] = this.unproject(this.w / 2, this.h / 2); $('#coords').textContent = fmtDM(lat, lon);
-    const pxPerNm = this.scale / 60 / Math.cos(lat * RAD); const nice = [1, 2, 5, 10, 20, 50, 100, 200, 500].find(n => n * pxPerNm >= 60) || 500;
+    const pxPerNm = (this.base ? Base.pxPerDegLon() : this.scale) / 60 / Math.cos(lat * RAD); const nice = [1, 2, 5, 10, 20, 50, 100, 200, 500].find(n => n * pxPerNm >= 60) || 500;
     $('#scalebar').querySelector('i').style.setProperty('--w', (nice * pxPerNm).toFixed(0) + 'px'); $('#scaletxt').textContent = nice + ' nm';
   },
   snapshot(b, w, h) {
@@ -213,7 +217,23 @@ function boundsOf(pts) { const b = [999, 999, -999, -999]; for (const p of pts) 
 function passFilter(a) { if (S.type !== 'all' && a.v.type !== S.type) return false; if (S.flaggedOnly && !a.sev.high) return false; return true; }
 
 /* ---------------------------------- gestures ---------------------------------- */
+function isDark() { const t = document.documentElement.getAttribute('data-theme'); return t === 'dark' || (!t && matchMedia('(prefers-color-scheme: dark)').matches); }
+function startBase() {
+  const stage = $('#stage'), el = $('#basemap');
+  if (!SET.baseMap || !el) return;
+  const ok = Base.init(el, {
+    onReady() { stage.classList.add('tiles'); $('#attrib').hidden = false; Chart.draw(); },
+    onFail() { stage.classList.remove('tiles'); $('#attrib').hidden = true; $('#map').style.pointerEvents = ''; wireGestures($('#map')); Chart.fitBounds(REGIONS[S.region].bounds, false); },
+    onMove() { Chart.draw(); },
+    onMoveEnd() { onMoveEnd(); },
+    onTap(x, y) { onTap(x, y); },
+    onHover(x, y) { return !!Chart.hitTest(x, y); },
+  }, isDark());
+  if (ok) stage.classList.add('base');
+}
+
 function wireGestures(cv) {
+  if (Base.active) { cv.style.pointerEvents = 'none'; return; }
   const ptrs = new Map(); let pinch = null, down = null, moved = false, lastTap = 0;
   cv.addEventListener('pointerdown', e => { cv.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, { x: e.offsetX, y: e.offsetY }); if (ptrs.size === 1) { down = { x: e.offsetX, y: e.offsetY, t: performance.now() }; moved = false; } if (ptrs.size === 2) { const [a, b] = [...ptrs.values()]; pinch = { d: Math.hypot(a.x - b.x, a.y - b.y), mx: (a.x + b.x) / 2, my: (a.y + b.y) / 2 }; } });
   cv.addEventListener('pointermove', e => {
@@ -464,7 +484,7 @@ function renderProfilePage() {
     <p class="gf">North Korea is on the list in the brief but outside the regions this build charts. In production you draw or import zones as GeoJSON (<span class="mono">config/zones.geojson</span>).</p></div>`;
   if (pv === 'look') return `${topbar('Appearance', back)}<div class="content"><h1 class="largetitle">Appearance &amp; chart</h1>
     <div class="gh">Theme</div><div class="seg">${[['system', 'System'], ['light', 'Light'], ['dark', 'Dark']].map(([k, l]) => `<button data-act="theme" data-id="${k}" aria-pressed="${SET.theme === k}">${l}</button>`).join('')}</div>
-    <div class="gh">Chart</div><div class="group"><div class="grow"><div class="lbl"><b>Port labels</b></div>${sw('portLabels', SET.portLabels)}</div><div class="grow"><div class="lbl"><b>Graticule</b><span>Latitude and longitude grid</span></div>${sw('graticule', SET.graticule)}</div></div>
+    <div class="gh">Chart</div><div class="group"><div class="grow"><div class="lbl"><b>Map tiles</b><span>OpenFreeMap base map · off = schematic coastlines, works offline</span></div>${sw('baseMap', SET.baseMap)}</div><div class="grow"><div class="lbl"><b>Port labels</b></div>${sw('portLabels', SET.portLabels)}</div><div class="grow"><div class="lbl"><b>Graticule</b><span>Latitude and longitude grid</span></div>${sw('graticule', SET.graticule)}</div></div>
     <div class="gh">Time</div><div class="group"><div class="grow"><div class="lbl"><b>Show times in local time</b><span>Default is UTC, as on the bridge</span></div>${sw('timeLocal', SET.timeLocal)}</div></div>
     <div class="gh">Accessibility</div><div class="group"><div class="grow"><div class="lbl"><b>Reduce transparency</b><span>Solid panels instead of glass</span></div>${sw('reduceTransparency', SET.reduceTransparency)}</div></div></div>`;
   if (pv === 'notify') return `${topbar('Notifications', back)}<div class="content"><h1 class="largetitle">Notifications</h1><p class="sub">What should reach your phone. Push delivery is part of the production build.</p>
@@ -566,12 +586,13 @@ function wireUI() {
     el.addEventListener('click', e => { const b = e.target.closest('[data-act]'); if (!b) return; pageAction(b.dataset.act, b); });
     el.addEventListener('change', e => { const t = e.target; if (t.dataset.rule) { const [g, k] = t.dataset.rule.split('.'); const v = parseFloat(t.value); if (Number.isFinite(v)) { RULES[g][k] = v; store.set('rules', RULES); rerun('Rules re-run on ' + FLEET.length + ' vessels'); } } if (t.id === 'apikey') { SET.apiKey = t.value; saveSettings(); } });
   }
-  $('#zin').addEventListener('click', () => { Chart.zoomAt(Chart.w / 2, Chart.h / 2, 1.6); onMoveEnd(); });
-  $('#zout').addEventListener('click', () => { Chart.zoomAt(Chart.w / 2, Chart.h / 2, 1 / 1.6); onMoveEnd(); });
+  $('#zin').addEventListener('click', () => { Chart.zoomAt(Chart.w / 2, Chart.h / 2, 1.6); if (!Base.active) onMoveEnd(); });
+  $('#zout').addEventListener('click', () => { Chart.zoomAt(Chart.w / 2, Chart.h / 2, 1 / 1.6); if (!Base.active) onMoveEnd(); });
   $('#zfit').addEventListener('click', () => { if (S.mode === 'vessel' || S.mode === 'voyage') { const a = ANALYSIS.get(S.imo); const vg = S.mode === 'voyage' && a.voyages.find(x => x.n === S.voyage); Chart.fitBounds(boundsOf(vg ? vg.pts : a.track)); } else Chart.fitBounds(REGIONS[S.region].bounds); });
   const redraw = () => Chart.draw();
-  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', redraw);
-  new MutationObserver(redraw).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+  const retheme = () => { Base.setTheme(isDark()); Chart.draw(); };
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', retheme);
+  new MutationObserver(retheme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(redraw);
   window.addEventListener('resize', () => { if (isMobile()) Sheet.snap(Sheet.pos); else Sheet.snap('half'); });
 }
@@ -596,6 +617,7 @@ function pageAction(act, b) {
     if (key.startsWith('zone:')) { const id = key.slice(5); SET.zonesOff = on ? SET.zonesOff.filter(z => z !== id) : [...SET.zonesOff, id]; saveSettings(); applyAppearance(); rerun(`${on ? 'Zone on' : 'Zone off'} · rules re-run`); return; }
     if (key.startsWith('notify.')) { SET.notify[key.slice(7)] = on; saveSettings(); return; }
     SET[key] = on; saveSettings(); applyAppearance();
+    if (key === 'baseMap') { toast(on ? 'Map tiles on after reload' : 'Schematic chart after reload'); return; }
     if (key === 'timeLocal') rerun(on ? 'Times shown in local time' : 'Times shown in UTC'); else Chart.draw();
   }
 }
@@ -619,7 +641,7 @@ function loadFleet(done) {
 function boot() {
   const savedRules = store.get('rules', null); if (savedRules) for (const k of Object.keys(savedRules)) if (RULES[k]) Object.assign(RULES[k], savedRules[k]);
   applyAppearance();
-  Chart.init($('#map')); wireGestures($('#map')); Sheet.init(); wireUI();
+  startBase(); Chart.init($('#map')); wireGestures($('#map')); Sheet.init(); wireUI();
   const hash = (location.hash || '').slice(1); const m = hash.match(/^imo(\d{7})$/);
   if (REGIONS[hash]) S.region = hash; syncRegions();
   Chart.fitBounds(REGIONS[S.region].bounds, false); Sheet.snap('half'); renderSheet();

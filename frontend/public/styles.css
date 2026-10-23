@@ -296,3 +296,13 @@ canvas#map{position:absolute;inset:0;width:100%;height:100%;touch-action:none;di
 .rtab-wrap{overflow-x:auto}
 .toast{position:fixed;left:50%;bottom:calc(var(--tab-h) + 40px);transform:translateX(-50%);padding:9px 16px;border-radius:999px;font-size:14px;font-weight:500;z-index:40;white-space:nowrap}
 @media (prefers-reduced-motion:reduce){ .sheet,.tabbar,.switch,.switch::after{transition:none} }
+
+/* base map layer (MapLibre) under the canvas chart */
+#basemap{position:absolute;inset:0}
+#basemap:empty{display:none}
+.maplibregl-map{position:absolute;inset:0;overflow:hidden}
+.maplibregl-canvas-container,.maplibregl-canvas{position:absolute;left:0;top:0;width:100%;height:100%}
+.stage.base canvas#map{pointer-events:none}
+.stage.tiles{background:transparent}
+.attrib{position:absolute;left:var(--gl);top:112px;font-size:10px;color:var(--label);background:color-mix(in srgb,var(--surface) 75%,transparent);padding:2px 6px;border-radius:6px;pointer-events:auto}
+.attrib a{color:inherit}

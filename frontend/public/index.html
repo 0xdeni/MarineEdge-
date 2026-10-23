@@ -15,6 +15,7 @@
 <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400..700;1,400..700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist/maplibre-gl.css">
 <link rel="stylesheet" href="./styles.css">
 <script>window.VVT_CONFIG = { source: new URLSearchParams(location.search).get("source") || "mock", apiBase: "" };</script>
 </head>
@@ -23,10 +24,12 @@
   <main class="pages">
     <section class="page" id="page-chart">
       <div class="stage" id="stage">
+        <div id="basemap" aria-hidden="true"></div>
         <canvas id="map" aria-label="Chart"></canvas>
         <div class="mapui">
           <div class="regions glass" id="regions" role="tablist" aria-label="Regions"></div>
           <div class="zstack glass"><button id="zin" aria-label="Zoom in"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button><button id="zout" aria-label="Zoom out"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 12h14"/></svg></button><button id="zfit" aria-label="Fit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="6"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg></button></div>
+          <div class="attrib" id="attrib" hidden>© <a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a> © <a href="https://www.openmaptiles.org/" target="_blank" rel="noopener">OpenMapTiles</a> · data from <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a></div>
           <div class="readout"><div class="bar" id="scalebar"><i style="--w:60px"></i><span id="scaletxt">50 nm</span></div><span id="coords">44°43.0′N 037°46.0′E</span></div>
           <div class="loading glass" id="loading">Loading sample fleet…</div>
         </div>
@@ -48,7 +51,9 @@
 </div>
 <div class="login" id="login" hidden></div>
 <div class="report" id="report" hidden></div>
+<script src="https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist/maplibre-gl.js" crossorigin="anonymous"></script>
 <script src="./geo.js"></script>
+<script src="./base.js"></script>
 <script src="./core.js"></script>
 <script src="./api.js"></script>
 <script src="./app.js"></script>
