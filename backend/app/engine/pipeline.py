@@ -33,7 +33,7 @@ def derive_status(track: list[Position], voyages, calls, ref: RefData, region: s
 
 
 def analyze(vessel: Vessel, raw: list[Position], ref: RefData, rules: Rules, now: Optional[int] = None,
-            vessels_near: Optional[NearFn] = None, destination: str = "", eta: Optional[int] = None) -> Analysis:
+            vessels_near: Optional[NearFn] = None, destination: str = "", eta: Optional[int] = None, coverage=None) -> Analysis:
     t_start = time.perf_counter()
     now = now if now is not None else int(time.time() * 1000)
     track, dup, bad = clean_track(raw)
@@ -42,7 +42,7 @@ def analyze(vessel: Vessel, raw: list[Position], ref: RefData, rules: Rules, now
     for pc in calls:
         for i in range(pc.i0, pc.i1 + 1):
             in_port[i] = True
-    ctx = Ctx(vessel=vessel, track=track, port_calls=calls, in_port=in_port, ref=ref, rules=rules, now=now, vessels_near=vessels_near)
+    ctx = Ctx(vessel=vessel, track=track, port_calls=calls, in_port=in_port, ref=ref, rules=rules, now=now, vessels_near=vessels_near, coverage=coverage)
     flags = run_rules(ctx)
     voyages = split_voyages(track, calls)      # after rules so jump fixes are excluded from distances
     for i, f in enumerate(flags):

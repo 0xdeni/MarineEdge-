@@ -4,7 +4,7 @@ No terminal is needed for any step. Items are in the order that unblocks the mos
 
 ## A. Get a server running (15 minutes, one evening)
 
-- [ ] **A1. Hetzner account** (or DigitalOcean/Vultr; Hetzner is cheapest and has an iPhone app). Sign up at hetzner.com › Cloud, add a payment method.
+- [ ] **A1. Hetzner account** (or DigitalOcean/Vultr; Hetzner is cheapest and has an iPhone app). Sign up at hetzner.com › Cloud, add a payment method. **Free option:** Oracle Cloud "Always Free" (cloud.oracle.com; needs a card for identity only) — same paste, shape VM.Standard.A1.Flex 4 OCPU/24 GB, then add ingress rules for TCP 80 and 443 in the instance's VCN security list. If Oracle rejects the sign-up (it happens), Hetzner is €4.5/month.
 - [ ] **A2. Copy the setup file.** In Safari open `github.com/0xdeni/MarineEdge-/blob/main/deploy/cloud-init.yaml`, tap **Raw**, select all, copy.
 - [ ] **A3. Create the server.** Hetzner app › New server: location Helsinki or Falkenstein · image **Ubuntu 24.04** · type **CX22** (2 vCPU, 4 GB) · scroll to **Cloud config / user data** · paste · edit the line `ADMIN_TOKEN=` to a long passphrase of your choice (this becomes your sign-in password; keep it in your password manager) · leave `DOMAIN=` empty · Create.
 - [ ] **A4. Open the app.** Wait 5–8 minutes, then open `https://<server IP with dashes>.sslip.io` (IP 95.217.12.34 → `https://95-217-12-34.sslip.io`). Sign in with any email and your ADMIN_TOKEN. Tap Share › **Add to Home Screen** so it runs as an app and can receive push.
@@ -12,7 +12,11 @@ No terminal is needed for any step. Items are in the order that unblocks the mos
 
 ## B. Connect real AIS data (same evening)
 
-- [ ] **B1. Datalastic trial.** datalastic.com › sign up (trial or Starter plan). The API key appears in their dashboard; copy it.
+Two routes; do B0 tonight regardless, it costs nothing and history starts the moment it runs. Details in `docs/FREE-STACK.md`.
+
+- [ ] **B0. Free live AIS (aisstream.io).** In Safari open aisstream.io › **Sign in with GitHub** (create a free GitHub account if you have none) › API keys › create › copy. In the app: Profile › AIS provider › **aisstream.io (free)** › paste › **Save key and switch**. Within a minute the **Recorded AIS** box on that screen starts counting positions. From today on you own your history; nothing is bought. Limits: no positions from before today, no open-sea (satellite) coverage.
+- [ ] **B0b. Free cross-check (optional).** globalfishingwatch.org › Our APIs › register (free; say research/non-commercial) › create a token › paste in Profile › AIS provider › **Cross-check token**. Every vessel then gets a "Cross-check with Global Fishing Watch" button (their satellite-based port visits, loitering, encounters, AIS-off events). Their licence is non-commercial — fine for evaluation; ask them in writing before paid use.
+- [ ] **B1. Datalastic trial** (paid; only needed for ships whose *past* 12 months you must see, or for open-sea coverage). datalastic.com › sign up (trial or Starter plan). The API key appears in their dashboard; copy it.
 - [ ] **B2. Paste the key in the app.** Profile › AIS provider › tap **Datalastic** › paste in **Key** › **Save key and switch** › **Test connection**. The result line shows matches and credits used. Send me a screenshot of that line.
 - [ ] **B3. First pull.** Still on that screen, type 3–5 IMO numbers of ships you care about (one that you know went dark or called a sanctioned port) and tap **Run first pull**. Each ship shows five checks. Screenshot the results to me. This is the M1 acceptance test; if any check fails I fix the field mapping and the server updates itself within 10 minutes.
 - [ ] **B4. Kpler/MarineTraffic trial** (second provider, for comparison). kpler.com › MarineTraffic API › contact sales. Ask in writing: (1) price for 12 months of hourly history per IMO and for "vessels in area" polling of five boxes every 5 minutes; (2) whether historical "vessels within 500 m of a point" queries exist and what they cost; (3) confirmation you may store positions and show them in an internal tool. Forward the answers to me.

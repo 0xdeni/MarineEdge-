@@ -37,7 +37,11 @@ class Service:
     def _make(self, name: Optional[str], api_key: Optional[str] = None) -> AISProvider:
         from app import settings_store
         nm = (name or settings_store.provider_name()).lower()
-        return make_provider(nm, api_key=api_key, ref=self.ref) if nm == "mock" else make_provider(nm, api_key=api_key)
+        if nm == "mock":
+            return make_provider(nm, api_key=api_key, ref=self.ref)
+        if nm == "aisstream":
+            return make_provider(nm, store=self.store)
+        return make_provider(nm, api_key=api_key)
 
     def _sync(self) -> None:
         """Rebuild the provider when another worker (or the CLI) changed the settings file."""
@@ -147,7 +151,8 @@ class Service:
         def near(lat, lon, r_m, t0, t1):
             return [(n.vessel, n.t0, n.t1) for n in self.provider.get_vessels_near(lat, lon, r_m, t0, t1)]
 
-        a = analyze(v, self.track(imo), self.ref, self.rules, now=self._now(), vessels_near=near, destination=st.destination, eta=st.eta)
+        cov = getattr(self.provider, "coverage", None)
+        a = analyze(v, self.track(imo), self.ref, self.rules, now=self._now(), vessels_near=near, destination=st.destination, eta=st.eta, coverage=cov)
         try:
             self.store.save_analysis(a)
         except Exception:  # the analysis is still served if the DB write fails

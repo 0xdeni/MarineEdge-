@@ -31,6 +31,8 @@ const API = {
   adminProvider(provider, api_key) { return this.send('POST', '/api/admin/provider', { provider, api_key: api_key || null }); },
   adminTest() { return this.send('POST', '/api/admin/test'); },
   adminFirstPull(imos) { return this.send('POST', '/api/admin/first-pull', { imos }); },
+  adminKey(name, api_key) { return this.send('POST', '/api/admin/key', { name, api_key: api_key || null }); },
+  crosscheck(imo) { return this.get(`/api/vessels/${imo}/crosscheck`); },
   jobsSanctions() { return this.send('POST', '/api/jobs/sanctions'); },
   jobsRefresh() { return this.send('POST', '/api/jobs/refresh'); },
   search(q) { return this.get('/api/vessels/search?q=' + encodeURIComponent(q)); },

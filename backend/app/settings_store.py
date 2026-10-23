@@ -10,7 +10,7 @@ from typing import Any
 
 DATA_DIR = Path(os.environ.get("VVT_DATA_DIR", "/data" if Path("/data").is_dir() else Path.home() / ".marineedge"))
 FILE = DATA_DIR / "settings.json"
-KEY_ENV = {"datalastic": "DATALASTIC_API_KEY", "kpler": "KPLER_API_KEY"}
+KEY_ENV = {"datalastic": "DATALASTIC_API_KEY", "kpler": "KPLER_API_KEY", "aisstream": "AISSTREAM_API_KEY", "gfw": "GFW_API_TOKEN"}
 
 
 def version() -> int:
@@ -55,6 +55,19 @@ def set_provider(name: str, api_key: str | None) -> None:
     d["updated"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     if api_key:
         d.setdefault("keys", {})[name] = api_key.strip()
+    save(d)
+
+
+def set_key(name: str, api_key: str | None) -> None:
+    """Store (or clear) one key without switching the active provider — used for the GFW cross-check token."""
+    import time
+    d = load()
+    keys = d.setdefault("keys", {})
+    if api_key and api_key.strip():
+        keys[name] = api_key.strip()
+    else:
+        keys.pop(name, None)
+    d["updated"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     save(d)
 
 

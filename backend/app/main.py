@@ -123,7 +123,12 @@ def me(request: Request):
 @app.get("/api/admin/config", dependencies=[Depends(require_admin)])
 def admin_config():
     from app import settings_store
-    return {**settings_store.public_view(), "active": getattr(svc.provider, "name", "?"), "credits_used": getattr(svc.provider, "credits_used", 0),
+    live = None
+    try:
+        live = svc.store.live_stats()
+    except Exception:  # noqa: BLE001  table missing until migration 003 runs
+        live = None
+    return {**settings_store.public_view(), "active": getattr(svc.provider, "name", "?"), "credits_used": getattr(svc.provider, "credits_used", 0), "live": live,
             "fetches_this_run": svc.fetches, "rules": dict(svc.rules), "zones": [{"id": z.id, "name": z.name, "enabled": z.enabled} for z in svc.ref.zones],
             "database": bool(os.environ.get("DATABASE_URL")), "push": push.configured(), "auth": "token" if auth_enabled() else "open"}
 
@@ -135,8 +140,8 @@ class ProviderBody(BaseModel):
 
 @app.post("/api/admin/provider", dependencies=[Depends(require_admin)])
 def admin_provider(body: ProviderBody):
-    if body.provider not in ("mock", "datalastic", "kpler"):
-        raise HTTPException(400, "provider must be mock, datalastic or kpler")
+    if body.provider not in ("mock", "datalastic", "kpler", "aisstream"):
+        raise HTTPException(400, "provider must be mock, aisstream, datalastic or kpler")
     try:
         return svc.set_provider(body.provider, body.api_key)
     except ProviderError as e:
@@ -146,6 +151,34 @@ def admin_provider(body: ProviderBody):
 @app.post("/api/admin/test", dependencies=[Depends(require_admin)])
 def admin_test():
     return svc.test_provider()
+
+
+class KeyBody(BaseModel):
+    name: str
+    api_key: Optional[str] = None
+
+
+@app.post("/api/admin/key", dependencies=[Depends(require_admin)])
+def admin_key(body: KeyBody):
+    """Store a key that is not an AIS provider switch (today: the Global Fishing Watch token)."""
+    from app import settings_store
+    if body.name not in settings_store.KEY_ENV:
+        raise HTTPException(400, f"unknown key name {body.name!r}")
+    settings_store.set_key(body.name, body.api_key)
+    return settings_store.public_view()
+
+
+@app.get("/api/vessels/{imo}/crosscheck")
+def crosscheck(imo: int):
+    """Independent second opinion from Global Fishing Watch events (port visits, loitering, encounters, AIS-off)."""
+    from app import settings_store
+    from app.engine.types import YEAR
+    from app.providers.gfw import GFWClient
+    token = settings_store.provider_key("gfw")
+    if not token:
+        return {"ok": False, "imo": imo, "source": "Global Fishing Watch", "error": "no Global Fishing Watch token yet — Profile › AIS provider › Cross-check token"}
+    now = svc._now()
+    return GFWClient(token).crosscheck(imo, now - YEAR, now)
 
 
 class FirstPull(BaseModel):

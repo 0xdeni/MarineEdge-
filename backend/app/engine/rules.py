@@ -46,6 +46,7 @@ class Ctx:
     rules: Rules
     now: int
     vessels_near: Optional[NearFn] = None
+    coverage: Optional[Callable[[float, float], int]] = None   # fixes per cell near a point (terrestrial feeds only)
 
 
 # ---------------------------------------------------------------- rule 1: sanctions
@@ -92,11 +93,19 @@ def rule_ais_gap(c: Ctx) -> list[Flag]:
         zone, znm = c.ref.nearest_zone(a.lon, a.lat)
         hours = dt / H
         high = hours > r.high_hours or znm <= r.near_sensitive_nm
-        out.append(Flag(rule="AIS gap", severity="high" if high else "medium", t0=a.t, t1=b.t, lat=a.lat, lon=a.lon, hours=hours,
-                        title=f"AIS gap of {round(hours)} hours",
-                        lines=[f"Off {fmt_dt(a.t)}, back on {fmt_dt(b.t)} UTC",
-                               f"Last position {fmt_dm(a.lat, a.lon)} · {round(znm)} nm from {zone.name if zone else 'any sensitive zone'}",
-                               f"Reappeared {round(nm_dist(a.lat, a.lon, b.lat, b.lon))} nm away · {'satellite' if a.src == 'S' else 'terrestrial'} AIS before the gap"],
+        severity, title = ("high" if high else "medium"), f"AIS gap of {round(hours)} hours"
+        lines = [f"Off {fmt_dt(a.t)}, back on {fmt_dt(b.t)} UTC",
+                 f"Last position {fmt_dm(a.lat, a.lon)} · {round(znm)} nm from {zone.name if zone else 'any sensitive zone'}",
+                 f"Reappeared {round(nm_dist(a.lat, a.lon, b.lat, b.lon))} nm away · {'satellite' if a.src == 'S' else 'terrestrial'} AIS before the gap"]
+        if c.coverage is not None:
+            cov = min(c.coverage(a.lon, a.lat), c.coverage(b.lon, b.lat))
+            min_fixes = int(r.get("coverage_min_fixes", 50) or 0)
+            if cov < min_fixes and hours <= r.get("coverage_max_hours", 72):
+                severity, title = "info", f"No AIS received for {round(hours)} hours (outside receiver coverage)"
+                lines.append(f"Receiver coverage at the last position: {cov} fixes in 30 days (below {min_fixes}); terrestrial feeds do not see open sea. Not treated as a deliberate gap.")
+            else:
+                lines.append(f"Receiver coverage at the last position: {cov} fixes in 30 days")
+        out.append(Flag(rule="AIS gap", severity=severity, t0=a.t, t1=b.t, lat=a.lat, lon=a.lon, hours=hours, title=title, lines=lines,
                         evidence_before=c.track[max(0, i - 3):i], evidence_after=c.track[i:i + 3]))
     return out
 

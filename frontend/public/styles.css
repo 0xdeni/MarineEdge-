@@ -307,3 +307,6 @@ canvas#map{position:absolute;inset:0;width:100%;height:100%;touch-action:none;di
 .stage.tiles{background:transparent}
 .attrib{position:absolute;left:var(--gl);top:112px;font-size:10px;color:var(--label);background:color-mix(in srgb,var(--surface) 75%,transparent);padding:2px 6px;border-radius:6px;pointer-events:auto}
 .attrib a{color:inherit}
+
+/* inline text button (cross-check rows) */
+.lnk{background:none;border:0;padding:0 2px;color:var(--accent);font:inherit;font-weight:600;cursor:pointer}

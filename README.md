@@ -40,7 +40,7 @@ python -m app.cli first-pull 9000036 …     # acceptance checks on real IMOs on
 
 ## Switching to a real AIS provider
 
-Put the key in `.env`, set `VVT_PROVIDER=datalastic` (or `kpler` once the adapter is filled in), restart. Nothing else changes; see `docs/PROVIDERS.md` for the trial checklist and the first-pull sanity checks.
+Put the key in `.env`, set `VVT_PROVIDER=datalastic` (or `kpler` once the adapter is filled in), restart. Nothing else changes; see `docs/PROVIDERS.md` for the trial checklist and the first-pull sanity checks. Free alternative: the `recorder` container records aisstream.io live AIS into your own database from day one (provider `aisstream`, zero credits) — trade-offs in `docs/FREE-STACK.md`.
 
 ## API
 

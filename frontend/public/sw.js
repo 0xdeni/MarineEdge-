@@ -1,6 +1,6 @@
 /* Service worker: app shell cached for offline use, API responses network-first with a cache fallback,
    so the last analysed vessels still open on a phone with no signal. Bump VERSION on every deploy. */
-const VERSION = 'marineedge-v0.4.0';
+const VERSION = 'marineedge-v0.5.0';
 const SHELL = ['./', './index.html', './styles.css', './geo.js', './base.js', './core.js', './api.js', './app.js', './manifest.webmanifest', './icons/icon.svg'];
 
 self.addEventListener('install', e => {

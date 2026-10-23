@@ -34,6 +34,16 @@ if ! command -v docker >/dev/null 2>&1; then
 fi
 command -v git >/dev/null 2>&1 || { apt-get update -qq; apt-get install -y -qq git >/dev/null; }
 
+# 2b. Oracle Cloud "Always Free" Ubuntu images ship iptables rules that REJECT everything but SSH.
+#     Open 80/443 there (no-op on Hetzner/DigitalOcean images, which have no such rule).
+if command -v iptables >/dev/null 2>&1 && iptables -S INPUT 2>/dev/null | grep -q -- '-j REJECT'; then
+  for port in 80 443; do
+    iptables -C INPUT -p tcp --dport "$port" -j ACCEPT 2>/dev/null || iptables -I INPUT 5 -p tcp --dport "$port" -j ACCEPT
+  done
+  command -v netfilter-persistent >/dev/null 2>&1 && netfilter-persistent save >/dev/null 2>&1 || true
+  echo "== opened ports 80/443 in iptables (Oracle image); also allow them in the VCN security list"
+fi
+
 # 3. Code
 if [ -d "$DIR/.git" ]; then
   git -C "$DIR" pull -q --ff-only
@@ -67,6 +77,9 @@ VVT_REPORT_DIR=/data/reports
 VVT_DATA_DIR=/data
 PUSH_MIN_SEVERITY=high
 UK_SANCTIONS_CSV_URL=
+# AIS keys are normally pasted in the app (Profile › AIS provider); these are only fallbacks.
+AISSTREAM_API_KEY=
+GFW_API_TOKEN=
 RCLONE_REMOTE=
 OPENSANCTIONS=0
 EOF

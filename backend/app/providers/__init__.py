@@ -14,6 +14,11 @@ def make_provider(name: str | None = None, api_key: str | None = None, **kw) -> 
         from .mock import MockProvider
         return MockProvider(**kw)
     key = api_key or settings_store.provider_key(name)
+    if name == "aisstream":
+        from .aisstream import OwnAISProvider
+        if kw.get("store") is None:
+            raise ProviderError("aisstream provider needs the store")
+        return OwnAISProvider(kw["store"])
     if name == "datalastic":
         from .datalastic import DatalasticProvider
         return DatalasticProvider(api_key=key)

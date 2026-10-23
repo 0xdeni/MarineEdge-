@@ -11,6 +11,8 @@ ais_gap:
   min_hours: 6               # no position for longer than this, at sea
   high_hours: 24             # High severity when the gap is longer than this
   near_sensitive_nm: 100     # ... or when it starts within this distance of a sensitive zone
+  coverage_min_fixes: 50     # terrestrial feeds only: a cell with fewer fixes than this in 30 days is 'no coverage'
+  coverage_max_hours: 72     # ... and gaps up to this length there are Info, not a flag
 
 draught_change:
   min_meters: 1.0            # reported draught moves by at least this much with no port call between

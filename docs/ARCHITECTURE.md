@@ -22,3 +22,19 @@ config/           rules.yaml · zones.geojson · ports.csv · areas.json
 **Frontend parity.** `service.analysis_json()` mirrors the object `core.js` builds (`track`, `portCalls`, `voyages`, `flags`, `sev`, `status`, `stats`), and `api.js:hydrate()` restores the cross-references (voyage ↔ flags ↔ port calls). Screens never know which source filled the object.
 
 **What changes for M2b.** MapLibre GL with OpenFreeMap tiles as the base layer; the canvas chart becomes an overlay for voyages, flags and the live marker (it already renders in its own layer).
+
+## Free data path (added 23 Oct 2026)
+
+```
+aisstream.io websocket ──► app/recorder.py (container `recorder`) ──► ais_live, mmsi_map (PostGIS)
+                                                                        │
+                       OwnAISProvider (app/providers/aisstream.py) ◄────┘   same Protocol as Datalastic/Kpler
+                              │  get_track / search / vessels_near / vessels_in_area / get_static / coverage()
+                              ▼
+                       Service.analysis() ─► engine.analyze(..., coverage=provider.coverage)
+                                                 └─ rule_ais_gap: gap in a cell with < coverage_min_fixes fixes → Info
+Global Fishing Watch API v3 (app/providers/gfw.py) ─► /api/vessels/{imo}/crosscheck ─► "Cross-check" section (second opinion only)
+```
+
+Positions are keyed by MMSI on arrival (that is what AIS transmits) and get their IMO from the ship's static broadcast; `live_backfill_imo` links earlier rows once the MMSI→IMO pair is known. Several MMSIs for one IMO become MMSI-history rows on the vessel (identity-change rule).
+

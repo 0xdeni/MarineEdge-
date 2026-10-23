@@ -56,6 +56,15 @@ class H(SimpleHTTPRequestHandler):
             if p == "/api/fleet":
                 svc.provider.generate_all()
                 return self._json([analysis_json(svc.analysis(v.imo), include_track=False) for v in svc.provider.fleet])
+            if p.startswith("/api/vessels/") and p.endswith("/crosscheck"):
+                from app import settings_store
+                from app.engine.types import YEAR
+                from app.providers.gfw import GFWClient
+                tok = settings_store.provider_key("gfw")
+                if not tok:
+                    return self._json({"ok": False, "source": "Global Fishing Watch", "error": "no Global Fishing Watch token yet — Profile › AIS provider › Cross-check token"})
+                now = svc._now()
+                return self._json(GFWClient(tok).crosscheck(int(p.split("/")[3]), now - YEAR, now))
             if p.startswith("/api/vessels/") and p.endswith("/analysis"):
                 imo = int(p.split("/")[3])
                 return self._json(analysis_json(svc.analysis(imo), include_track=q.get("track", ["1"])[0] != "0"))
@@ -70,7 +79,7 @@ class H(SimpleHTTPRequestHandler):
                 return self._json({"user": USER, "role": "admin", "watchlist": svc.store.get_watchlist(USER), "push": {"configured": False, "publicKey": ""}, "provider": getattr(svc.provider, "name", "?")})
             if p == "/api/admin/config":
                 from app import settings_store
-                return self._json({**settings_store.public_view(), "active": getattr(svc.provider, "name", "?"), "credits_used": getattr(svc.provider, "credits_used", 0), "fetches_this_run": svc.fetches, "database": False, "push": False, "auth": "open"})
+                return self._json({**settings_store.public_view(), "active": getattr(svc.provider, "name", "?"), "credits_used": getattr(svc.provider, "credits_used", 0), "fetches_this_run": svc.fetches, "live": svc.store.live_stats(), "database": False, "push": False, "auth": "open"})
             if p.startswith("/api/me/notes/"):
                 return self._json(svc.store.get_notes(USER, int(p.split("/")[4])))
             if p == "/api/alerts":
@@ -122,6 +131,12 @@ class H(SimpleHTTPRequestHandler):
                 return self._json(svc.test_provider())
             except Exception as e:  # noqa: BLE001
                 return self._json({"ok": False, "error": str(e)[:300]})
+        if p == "/api/admin/key":
+            from app import settings_store
+            if body.get("name") not in settings_store.KEY_ENV:
+                return self._json({"error": "unknown key name"}, 400)
+            settings_store.set_key(body["name"], body.get("api_key"))
+            return self._json(settings_store.public_view())
         if p == "/api/admin/first-pull":
             return self._json(svc.first_pull([int(i) for i in body.get("imos", [])][:10]))
         if p == "/api/jobs/sanctions":

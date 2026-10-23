@@ -6,7 +6,7 @@ rules, zones, watchlist, push) is changed inside the app.
 
 ## 1. Create the server (5 minutes)
 
-Hetzner Cloud (recommended, ~€4–8/month), DigitalOcean, Vultr or Scaleway all take a cloud-init file:
+Hetzner Cloud (recommended, ~€4–8/month), DigitalOcean, Vultr or Scaleway all take a cloud-init file. **Oracle Cloud Always Free** (€0, VM.Standard.A1.Flex 4 OCPU / 24 GB, Ubuntu 24.04) works with the same paste — put it under Advanced › Cloud-init, and afterwards add ingress rules for TCP 80 and 443 to the instance's VCN security list; the installer opens the same ports in the image's own firewall. See `docs/FREE-STACK.md` for the trade-offs.
 
 1. Open `deploy/cloud-init.yaml` on GitHub, tap Raw, select all, copy.
 2. In the provider's "create server" screen pick **Ubuntu 24.04**, the smallest 2 vCPU / 4 GB size, any EU location.
@@ -22,13 +22,13 @@ The server pulls every new commit from GitHub within 10 minutes (`AUTO_UPDATE=1`
 ## 2. Inside the app (phone)
 
 - **Add to Home Screen** (Safari share sheet) so it runs full-screen and can receive push notifications (iOS 16.4+).
-- **Profile › AIS provider**: tap Datalastic, paste the key, "Save key and switch", "Test connection", then type the IMOs and "Run first pull".
+- **Profile › AIS provider**: free path — tap **aisstream.io (free)**, paste the key from aisstream.io, "Save key and switch"; the **Recorded AIS** box starts counting within a minute. Paid path — tap Datalastic, paste the key, "Save key and switch", "Test connection", then type the IMOs and "Run first pull". Optional **Cross-check token** (Global Fishing Watch) on the same screen.
 - **Profile › Notifications**: "Enable push notifications on this device".
 - **Watch** a vessel: the refresh job (every 30 minutes) re-analyses watched ships and pushes new High flags.
 
 ## 3. What runs on the server
 
-`install.sh` installs Docker, clones the repo to `/opt/marineedge`, writes `.env` (random database password, your admin token, push keys), and starts four containers: PostGIS, the API, the web app, and Caddy (automatic HTTPS). Cron runs the nightly backup (03:00), the sanctions refresh (04:30), the watchlist refresh (every 30 min) and the auto-update (every 10 min). Logs: `/var/log/marineedge-*.log`.
+`install.sh` installs Docker, clones the repo to `/opt/marineedge`, writes `.env` (random database password, your admin token, push keys), and starts five containers: PostGIS, the API, the **recorder** (one websocket to aisstream.io, idle until a key is pasted in the app), the web app, and Caddy (automatic HTTPS). Cron runs the nightly backup (03:00), the sanctions refresh (04:30), the watchlist refresh (every 30 min), the auto-update (every 10 min) and a weekly prune of raw live positions older than 14 months. Logs: `/var/log/marineedge-*.log`; recorder logs with `docker compose logs -f recorder`.
 
 ## 4. With a terminal (optional)
 
