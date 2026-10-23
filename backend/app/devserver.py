@@ -79,7 +79,7 @@ class H(SimpleHTTPRequestHandler):
                 return self._json({"user": USER, "role": "admin", "watchlist": svc.store.get_watchlist(USER), "push": {"configured": False, "publicKey": ""}, "provider": getattr(svc.provider, "name", "?")})
             if p == "/api/admin/config":
                 from app import settings_store
-                return self._json({**settings_store.public_view(), "active": getattr(svc.provider, "name", "?"), "credits_used": getattr(svc.provider, "credits_used", 0), "fetches_this_run": svc.fetches, "live": svc.store.live_stats(), "database": False, "push": False, "auth": "open"})
+                return self._json({**settings_store.public_view(), "active": getattr(svc.provider, "name", "?"), "credits_used": getattr(svc.provider, "credits_used", 0), "fetches_this_run": svc.fetches, "live": svc.store.live_stats(), "update": settings_store.update_state(), "database": False, "push": False, "auth": "open"})
             if p.startswith("/api/me/notes/"):
                 return self._json(svc.store.get_notes(USER, int(p.split("/")[4])))
             if p == "/api/alerts":

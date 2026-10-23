@@ -19,6 +19,8 @@ Five minutes later: `https://<ip with dashes>.sslip.io` (example: IP 95.217.12.3
 
 The server pulls every new commit from GitHub within 10 minutes (`AUTO_UPDATE=1`), so fixes arrive without touching it. Set `AUTO_UPDATE=0` in the file later when you want releases to be deliberate.
 
+**The server is the CI.** `deploy/autoupdate.sh` does not blindly deploy: it builds the new image while the old one keeps serving, runs the full test suite inside the new image, and only then switches over, applies migrations and waits for `/api/health`. A failed build, a red test or an unhealthy API puts the previous commit back and the old containers stay up; that commit is not retried until a newer one lands. The verdict (commit, test summary, time, failure detail) is written to `state/update.json` and shown in the app under **Profile › AIS provider › Server updates** — green/red on the phone, no GitHub Actions needed.
+
 ## 2. Inside the app (phone)
 
 - **Add to Home Screen** (Safari share sheet) so it runs full-screen and can receive push notifications (iOS 16.4+).

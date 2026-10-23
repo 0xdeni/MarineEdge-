@@ -3,6 +3,7 @@ WORKDIR /srv
 COPY backend/requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 COPY backend/app ./app
+COPY backend/tests ./tests
 COPY backend/migrations ./migrations
 COPY config /config
 ENV VVT_CONFIG=/config VVT_RULES=/config/rules.yaml VVT_REPORT_DIR=/data/reports VVT_DATA_DIR=/data PYTHONUNBUFFERED=1

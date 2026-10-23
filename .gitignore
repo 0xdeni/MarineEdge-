@@ -8,3 +8,4 @@ dist/
 /data/
 *.pdf
 .DS_Store
+/state/

@@ -78,3 +78,15 @@ def masked(key: str) -> str:
 def public_view() -> dict[str, Any]:
     d = load()
     return {"provider": provider_name(), "keys": {k: masked(provider_key(k)) for k in KEY_ENV}, "file": str(FILE), "updated": d.get("updated")}
+
+
+def update_state() -> dict[str, Any] | None:
+    """Verdict of the last auto-update: deploy/autoupdate.sh writes state/update.json on the host, mounted
+    read-only at /state in the api container. None until the first update has run."""
+    p = Path(os.environ.get("VVT_STATE_DIR", "/state")) / "update.json"
+    if not p.exists():
+        p = Path(__file__).resolve().parents[2] / "state" / "update.json"
+    try:
+        return json.loads(p.read_text()) if p.exists() else None
+    except Exception:  # noqa: BLE001
+        return None

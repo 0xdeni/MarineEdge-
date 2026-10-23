@@ -128,7 +128,7 @@ def admin_config():
         live = svc.store.live_stats()
     except Exception:  # noqa: BLE001  table missing until migration 003 runs
         live = None
-    return {**settings_store.public_view(), "active": getattr(svc.provider, "name", "?"), "credits_used": getattr(svc.provider, "credits_used", 0), "live": live,
+    return {**settings_store.public_view(), "active": getattr(svc.provider, "name", "?"), "credits_used": getattr(svc.provider, "credits_used", 0), "live": live, "update": settings_store.update_state(),
             "fetches_this_run": svc.fetches, "rules": dict(svc.rules), "zones": [{"id": z.id, "name": z.name, "enabled": z.enabled} for z in svc.ref.zones],
             "database": bool(os.environ.get("DATABASE_URL")), "push": push.configured(), "auth": "token" if auth_enabled() else "open"}
 

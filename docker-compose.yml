@@ -9,7 +9,7 @@ services:
     env_file: .env
     environment: { DATABASE_URL: "${DATABASE_URL:-postgresql://vvt:vvt@db:5432/vvt}" }
     depends_on: [ db ]
-    volumes: [ "appdata:/data", "./config:/config:ro" ]
+    volumes: [ "appdata:/data", "./config:/config:ro", "./state:/state:ro" ]   # state/update.json = the auto-updater's verdict
     restart: unless-stopped
     ports: [ "8000:8000" ]
   recorder:   # free AIS path: keeps one websocket to aisstream.io open and writes positions into ais_live

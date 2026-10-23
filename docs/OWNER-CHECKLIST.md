@@ -29,7 +29,7 @@ Two routes; do B0 tonight regardless, it costs nothing and history starts the mo
 
 ## D. Before wider rollout
 
-- [ ] **D0. Unblock GitHub Actions (3 taps).** Actions is on, but every run dies before it starts ("startup_failure"), even a one-line test workflow, so the cause is your account or repo settings, not the code. In Safari: github.com/0xdeni/MarineEdge- › **Actions** › tap the top run and read the banner:
+- [ ] **D0. GitHub Actions (optional now).** The server itself tests every new commit before deploying it and shows the result in the app (Profile › AIS provider › Server updates), so Actions is a bonus, not a need. If you still want the GitHub tick: Actions is on, but every run dies before it starts ("startup_failure"), even a one-line test workflow, so the cause is your account or repo settings, not the code. In Safari: github.com/0xdeni/MarineEdge- › **Actions** › tap the top run and read the banner:
   - "…recent account payments have failed or your spending limit needs to be increased" → github.com/settings/billing › **Spending limits** › Actions: allow a small amount (e.g. $5) or fix the card. Private repos get 2,000 free minutes a month, so the bill stays $0; the limit just has to exist.
   - "…is not allowed to be used in…" → repo **Settings › Actions › General › Allow all actions and reusable workflows**.
   - "Your account has been flagged" → tap the support link in the banner (new accounts sometimes get this automatically).
