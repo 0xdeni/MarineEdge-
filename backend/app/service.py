@@ -10,7 +10,7 @@ from typing import Any, Optional
 from app.engine import analyze, load_refdata, load_rules
 from app.engine.refdata import RefData
 from app.engine.rules_config import Rules
-from app.engine.types import YEAR, Analysis, Flag, PortCall, Position, Vessel, Voyage
+from app.engine.types import Analysis, Flag, PortCall, Position, Vessel, Voyage
 from app.providers import AISProvider, make_provider
 from app.store import Store, make_store
 

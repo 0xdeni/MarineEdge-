@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import os
-
 from .base import AISProvider, CreditsExhausted, LiveStatic, Neighbour, ProviderError, VesselMatch  # noqa: F401
 
 

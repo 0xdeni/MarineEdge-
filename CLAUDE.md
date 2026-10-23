@@ -27,7 +27,7 @@ backend/app/settings_store.py  provider + key chosen from the app, stored on the
 backend/app/sanctions   OFAC/EU/UK loaders → sanctions table
 backend/app/reports     Jinja2 report → Playwright PDF
 backend/migrations      001_init.sql (PostGIS schema) · 002_alerts_push.sql · 003_live_ais.sql (ais_live, mmsi_map)
-backend/tests           synth.py + test_engine.py + test_sanctions.py + test_service.py + test_fleet.py + test_aisstream.py (37 tests)
+backend/tests           synth.py + test_engine.py + test_sanctions.py + test_service.py + test_fleet.py + test_aisstream.py + test_pgstore.py (38 tests; the PostGIS one runs when DATABASE_URL is set — CI does)
 frontend/public         index.html, styles.css, core.js (engine+mock), base.js (MapLibre), app.js (screens), api.js, sw.js, manifest
 config/                 rules.yaml, zones.geojson, ports.csv, areas.json
 docs/                   BRIEF.md, STATUS.md, PROVIDERS.md, FREE-STACK.md, ARCHITECTURE.md, DEPLOY.md, OWNER-CHECKLIST.md

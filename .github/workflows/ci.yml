@@ -2,18 +2,57 @@ name: ci
 on: [push, pull_request]
 jobs:
   engine:
+    # pure-Python engine, parsers, service and free-path tests; PostgresStore against a real PostGIS
     runs-on: ubuntu-latest
+    services:
+      postgis:
+        image: postgis/postgis:16-3.4
+        env: { POSTGRES_DB: vvt, POSTGRES_USER: vvt, POSTGRES_PASSWORD: vvt }
+        ports: [ "5432:5432" ]
+        options: --health-cmd "pg_isready -U vvt" --health-interval 5s --health-timeout 5s --health-retries 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: { python-version: "3.12" }
-      - run: pip install pyyaml pytest ruff
+      - run: pip install pyyaml pytest ruff "psycopg[binary]>=3.2" requests
       - run: cd backend && ruff check app tests
+      - name: apply migrations
+        run: for f in backend/migrations/*.sql; do psql "postgresql://vvt:vvt@localhost:5432/vvt" -v ON_ERROR_STOP=1 -q -f "$f"; done
       - run: cd backend && pytest -q
+        env: { DATABASE_URL: "postgresql://vvt:vvt@localhost:5432/vvt" }
   frontend:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: "22" }
-      - run: cd frontend/public && for f in core.js app.js api.js geo.js sw.js; do node --check "$f"; done
+      - run: cd frontend/public && for f in core.js app.js api.js geo.js base.js sw.js; do node --check "$f"; done
+  docker:
+    # the same images the one-paste installer builds; boots db + api + recorder + web and probes them
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: cp .env.example .env && sed -i 's/^VVT_REPORT_DIR=.*/VVT_REPORT_DIR=\/data\/reports/' .env
+      - run: docker compose build
+      - run: docker compose up -d db api recorder web
+      - name: wait for the API and the migrated database
+        run: |
+          for i in $(seq 1 40); do curl -fsS http://localhost:8000/api/health && break; sleep 3; done
+          curl -fsS http://localhost:8000/api/health
+          for i in $(seq 1 40); do docker compose exec -T db psql -U vvt -d vvt -tAc "select 1 from coverage_cells limit 1" >/dev/null 2>&1 && break; sleep 3; done
+          docker compose exec -T db psql -U vvt -d vvt -tAc "select count(*) from information_schema.tables where table_schema='public'"
+      - name: probe (mock provider, PostGIS store, open auth)
+        run: |
+          set -e
+          curl -fsS "http://localhost:8000/api/vessels/search?q=MAERSK" | head -c 400; echo
+          IMO=$(curl -fsS "http://localhost:8000/api/regions/blacksea/vessels" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d[0]['vessel']['imo'])")
+          curl -fsS "http://localhost:8000/api/vessels/$IMO/analysis" | python3 -c "import json,sys; d=json.load(sys.stdin); print('analysis ok', d['vessel']['name'], len(d['track']), 'positions', len(d['flags']), 'flags')"
+          curl -fsS "http://localhost:8000/api/vessels/$IMO/analysis" | python3 -c "import json,sys; d=json.load(sys.stdin); assert d['stats']['raw'] > 0"
+          curl -fsS "http://localhost:8000/api/admin/config" | python3 -c "import json,sys; d=json.load(sys.stdin); print('admin config ok · live stats:', d.get('live'))"
+          curl -fsS "http://localhost:8000/api/vessels/$IMO/crosscheck" | head -c 300; echo
+          curl -fsS -o /dev/null -w 'web %{http_code}\n' http://localhost:8080/
+          sleep 5; docker compose logs recorder | grep -q "no aisstream key yet" && echo "recorder idles correctly without a key"
+      - name: PDF report
+        run: curl -fsS -X POST -o report.pdf "http://localhost:8000/api/vessels/$(curl -fsS 'http://localhost:8000/api/regions/blacksea/vessels' | python3 -c "import json,sys; print(json.load(sys.stdin)[0]['vessel']['imo'])")/report" && file report.pdf | grep -q PDF && echo "pdf ok"
+      - run: docker compose logs --tail 80 api recorder db
+        if: always()

@@ -135,7 +135,10 @@ class Recorder:
     async def run(self) -> None:
         import websockets  # type: ignore
 
-        self.warm()
+        try:
+            self.warm()
+        except Exception as e:  # noqa: BLE001  database not up yet at boot: start cold, the map fills from the feed
+            log.warning("warm-up skipped (%s); static data will be learned from the feed", str(e)[:160])
         backoff = 2
         last_flush = last_stats = last_key = time.time()
         while not self.stop:

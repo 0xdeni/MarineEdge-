@@ -45,7 +45,7 @@ def _ts(meta: dict) -> int:
     if not s:
         return int(time.time() * 1000)
     try:
-        date, tm, *rest = s.split(" ")
+        date, tm, *_ = s.split(" ")
         tm = tm.split(".")[0]
         d = datetime.strptime(f"{date} {tm}", "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
         return int(d.timestamp() * 1000)

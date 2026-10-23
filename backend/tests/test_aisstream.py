@@ -33,7 +33,7 @@ def test_parse_position_report():
     assert abs(row["lat"] - 41.0201) < 1e-9 and abs(row["lon"] - 28.9912) < 1e-9
     assert row["sog"] == 11.4 and row["heading"] == 210 and row["nav"] == 0 and row["name"] == "BOSPHORUS QUEEN"
     # heading 511 = not available; bad coordinates and missing MMSI are dropped
-    k2, r2 = parse_message({**POS, "Message": {"PositionReport": {**POS["Message"]["PositionReport"], "TrueHeading": 511}}})
+    _k2, r2 = parse_message({**POS, "Message": {"PositionReport": {**POS["Message"]["PositionReport"], "TrueHeading": 511}}})
     assert r2["heading"] is None
     assert parse_message({**POS, "Message": {"PositionReport": {"Latitude": 91, "Longitude": 0}}}) is None
     assert parse_message({"MessageType": "PositionReport", "MetaData": {}, "Message": {"PositionReport": {}}}) is None

@@ -29,6 +29,8 @@ Two routes; do B0 tonight regardless, it costs nothing and history starts the mo
 
 ## D. Before wider rollout
 
+- [ ] **D0. Turn on GitHub Actions (2 taps, do it now).** In Safari: github.com/0xdeni/MarineEdge- › **Actions** tab. If it offers "I understand my workflows, go ahead and enable them", tap it. From then on every push builds the Docker images, boots the whole stack and runs 38 tests against a real PostGIS — a green tick means a server install will work; a red cross I see and fix without you. (If the tab already shows runs, nothing to do.)
+
 - [ ] **D1. Domain.** Buy or pick a subdomain (tracker.yourcompany.com), add an A record to the server IP, then tell me; the server switches to it with one setting change.
 - [ ] **D2. Company login.** Google Workspace or Microsoft? I add SSO in front of the app; until then each user gets a token (ask me, I add it).
 - [ ] **D3. UK sanctions link.** Once: open gov.uk/government/publications/the-uk-sanctions-list, copy the current CSV link, send it to me (the link changes with each publication; I will automate it).

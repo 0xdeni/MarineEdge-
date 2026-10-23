@@ -270,6 +270,9 @@ class PostgresStore:
     def put_positions(self, imo, pts, provider, start_ms, end_ms, credits):
         with self._conn() as c:
             with c.cursor() as cur:
+                # positions.imo references vessels(imo); the first fetch for a ship happens before save_analysis
+                # writes its particulars, so make sure the parent row exists (name is filled in later).
+                cur.execute("INSERT INTO vessels (imo, name) VALUES (%s, %s) ON CONFLICT DO NOTHING", (imo, str(imo)))
                 cur.executemany(
                     "INSERT INTO positions (imo, ts, geom, lat, lon, sog, cog, draught, nav, src, provider) "
                     "VALUES (%s, %s, ST_SetSRID(ST_MakePoint(%s, %s), 4326)::geography, %s, %s, %s, %s, %s, %s, %s, %s) ON CONFLICT DO NOTHING",
