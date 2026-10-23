@@ -22,7 +22,7 @@ class Service:
         self.ref = ref or load_refdata()
         self.rules = rules or load_rules()
         self.store = store or make_store()
-        self.provider = provider or make_provider(ref=self.ref) if provider is None and _is_mock() else (provider or make_provider())
+        self.provider = provider or self._make(None)
         self.now = now_ms
         self.fetches = 0
         self._cache: dict[int, Analysis] = {}
@@ -30,6 +30,60 @@ class Service:
     # ---- helpers ----
     def _now(self) -> int:
         return self.now or int(time.time() * 1000)
+
+    def _make(self, name: Optional[str], api_key: Optional[str] = None) -> AISProvider:
+        from app import settings_store
+        nm = (name or settings_store.provider_name()).lower()
+        return make_provider(nm, api_key=api_key, ref=self.ref) if nm == "mock" else make_provider(nm, api_key=api_key)
+
+    def set_provider(self, name: str, api_key: Optional[str] = None) -> dict:
+        """Admin action from the app: switch provider and/or key without a restart. The old provider's
+        analyses are dropped from the memory cache; stored positions stay (they are keyed on IMO)."""
+        from app import settings_store
+        settings_store.set_provider(name, api_key)
+        self.provider = self._make(name, api_key)
+        self._cache.clear()
+        return {"provider": getattr(self.provider, "name", name)}
+
+    def test_provider(self) -> dict:
+        """One cheap call to prove the key works: a name search (1 credit on Datalastic, 0 on mock)."""
+        t0 = time.perf_counter()
+        try:
+            res = self.provider.search_vessel("MAERSK")
+        except Exception as e:  # noqa: BLE001
+            msg = str(e)
+            k = getattr(self.provider, "key", "")
+            if k:
+                msg = msg.replace(k, "***")
+            return {"ok": False, "provider": getattr(self.provider, "name", "?"), "error": msg[:300]}
+        return {"ok": True, "provider": getattr(self.provider, "name", "?"), "matches": len(res), "sample": [m.name for m in res[:3]],
+                "credits_used": getattr(self.provider, "credits_used", 0), "ms": round((time.perf_counter() - t0) * 1000)}
+
+    def first_pull(self, imos: list[int]) -> list[dict]:
+        """The acceptance checklist from docs/PROVIDERS.md, as data for the app or the CLI."""
+        out = []
+        for imo in imos:
+            try:
+                a = self.analysis(imo)
+            except KeyError:
+                out.append({"imo": imo, "ok": False, "error": "unknown IMO for this provider"})
+                continue
+            except Exception as e:  # noqa: BLE001
+                msg = str(e)
+                for k in [getattr(self.provider, "key", "")]:
+                    if k:
+                        msg = msg.replace(k, "***")
+                out.append({"imo": imo, "ok": False, "error": msg[:300]})
+                continue
+            s = a.stats
+            start = self._now() - int(self.rules.history_months * 30.4 * 24 * 3_600_000)
+            checks = {"hourly positions for a year (≥ 1000)": s["clean"] >= 1000,
+                      "draught populated": any(p.draught > 0 for p in a.track),
+                      "port calls found (≥ 2)": s["port_calls"] >= 2,
+                      "voyages split": s["voyages"] >= 1,
+                      "cached for next time": self.store.covered(imo, start, self._now())}
+            out.append({"imo": imo, "name": a.vessel.name, "ok": all(checks.values()), "checks": checks, "stats": s, "sev": a.sev, "status": a.status.state})
+        return out
 
     def reload_rules(self) -> Rules:
         self.rules = load_rules()
@@ -91,11 +145,6 @@ class Service:
                         "flags": len(a.flags) if a else None, "high": a.sev["high"] if a else None,
                         "status": status_json(a) if a else None})
         return out
-
-
-def _is_mock() -> bool:
-    import os
-    return os.environ.get("VVT_PROVIDER", "mock").lower() == "mock"
 
 
 # ---------------------------------------------------------------- JSON shapes (mirror the frontend's)

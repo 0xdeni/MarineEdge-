@@ -93,22 +93,12 @@ def cmd_first_pull(a):
     """The acceptance checklist from docs/PROVIDERS.md, run on real IMOs the day a key arrives."""
     svc = _svc()
     print(f"provider: {getattr(svc.provider, 'name', '?')}")
-    for imo in a.imos:
-        try:
-            an = svc.analysis(imo)
-        except Exception as e:  # noqa: BLE001
-            print(f"{imo}: FAILED {e}")
+    for r in svc.first_pull(a.imos):
+        if not r.get("ok") and "error" in r:
+            print(f"{r['imo']}: FAILED {r['error']}")
             continue
-        s = an.stats
-        checks = {
-            "positions in the thousands (hourly fixes)": s["clean"] >= 1000,
-            "draught populated": any(p.draught > 0 for p in an.track),
-            "port calls found": s["port_calls"] >= 2,
-            "voyages split": s["voyages"] >= 1,
-            "cached (second read makes no provider call)": svc.store.covered(imo, svc._now() - int(svc.rules.history_months * 30.4 * 86_400_000), svc._now()),
-        }
-        print(f"{imo} {an.vessel.name}: {json.dumps(s)}")
-        for k, ok in checks.items():
+        print(f"{r['imo']} {r['name']}: {json.dumps(r['stats'])}")
+        for k, ok in r["checks"].items():
             print(f"   {'ok ' if ok else 'XX '} {k}")
 
 

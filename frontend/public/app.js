@@ -289,7 +289,7 @@ function vesselRow(a, extra = '') {
 }
 function toast(msg) { const t = document.createElement('div'); t.className = 'toast glass'; t.textContent = msg; document.body.appendChild(t); setTimeout(() => t.remove(), 1900); }
 function sw(key, on) { return `<button class="switch" role="switch" aria-checked="${on}" data-act="switch" data-key="${key}" aria-label="${key}"></button>`; }
-function grow(label, value, act = '', sub = '', ico = '') { return `<button class="grow" ${act ? `data-act="${act}"` : ''}>${ico}<div class="lbl"><b>${label}</b>${sub ? `<span>${sub}</span>` : ''}</div>${value !== undefined && value !== '' ? `<span class="val">${value}</span>` : ''}<span class="chev">${ICON.chevR}</span></button>`; }
+function grow(label, value, act = '', sub = '', ico = '') { const tag = act ? 'button' : 'div'; return `<${tag} class="grow" ${act ? `data-act="${act}"` : ''}>${ico}<div class="lbl"><b>${label}</b>${sub ? `<span>${sub}</span>` : ''}</div>${value !== undefined && value !== '' ? `<span class="val">${value}</span>` : ''}${act ? `<span class="chev">${ICON.chevR}</span>` : ''}</${tag}>`; }
 function ico(svg, color) { return `<span class="ico" style="background:${color}">${svg}</span>`; }
 
 /* ------------------------------------- chart sheet ------------------------------------- */
@@ -455,11 +455,12 @@ function renderProfilePage() {
   if (pv === 'root') return `${topbar('Profile')}<div class="content"><h1 class="largetitle">Profile</h1>
     <div class="pcard"><div class="avatar">${esc(initials)}</div><div><b>${esc(u.name)}</b><span>${esc(u.email)}</span><span>${esc(u.org || 'Your organisation')} · ${esc(u.role || 'Analyst')}</span></div></div>
     <div class="gh">Account</div><div class="group">${grow('Name', esc(u.name), 'edit-name')}${grow('Organisation', esc(u.org || 'Set'), 'edit-org')}${grow('Role', esc(u.role || 'Analyst'), 'edit-role')}</div>
-    <div class="gh">Settings</div><div class="group">${grow('AIS provider', { mock: 'Mock', kpler: 'Kpler', spire: 'Spire', datalastic: 'Datalastic', vesselfinder: 'VesselFinder' }[SET.provider] || 'Mock', 'pv-provider', '', ico(ICON.key, 'var(--accent)'))}${grow('Rules & thresholds', '', 'pv-rules', 'Every threshold the engine uses', ico(ICON.rules, 'var(--orange)'))}${grow('Sensitive zones', `${GEO.zones.filter(z => z.enabled !== false).length} on`, 'pv-zones', '', ico(ICON.zones, 'var(--red)'))}${grow('Appearance & chart', SET.theme === 'system' ? 'System' : SET.theme === 'dark' ? 'Dark' : 'Light', 'pv-look', '', ico(ICON.look, '#5856D6'))}${grow('Notifications', Object.values(SET.notify).filter(Boolean).length + ' on', 'pv-notify', '', ico(ICON.bell, 'var(--green)'))}${grow('About & data sources', '', 'pv-about', '', ico(ICON.info, 'var(--fg3)'))}</div>
+    <div class="gh">Settings</div><div class="group">${grow('AIS provider', API.server ? esc(((S.me && S.me.provider) || 'server').split(' (')[0]) : ({ mock: 'Mock', kpler: 'Kpler', spire: 'Spire', datalastic: 'Datalastic', vesselfinder: 'VesselFinder' }[SET.provider] || 'Mock'), 'pv-provider', '', ico(ICON.key, 'var(--accent)'))}${grow('Rules & thresholds', '', 'pv-rules', 'Every threshold the engine uses', ico(ICON.rules, 'var(--orange)'))}${grow('Sensitive zones', `${GEO.zones.filter(z => z.enabled !== false).length} on`, 'pv-zones', '', ico(ICON.zones, 'var(--red)'))}${grow('Appearance & chart', SET.theme === 'system' ? 'System' : SET.theme === 'dark' ? 'Dark' : 'Light', 'pv-look', '', ico(ICON.look, '#5856D6'))}${grow('Notifications', Object.values(SET.notify).filter(Boolean).length + ' on', 'pv-notify', '', ico(ICON.bell, 'var(--green)'))}${grow('About & data sources', '', 'pv-about', '', ico(ICON.info, 'var(--fg3)'))}</div>
     <div class="gh">On this device</div><div class="group">${grow('Watchlist', watchlist().length + ' vessels', 'go-vessels')}${grow('Analyst notes', Object.values(store.get('notes', {})).filter(t => t && t.trim()).length + ' notes')}${grow('Reports', store.get('reports', []).length)}<button class="grow red" data-act="cleardata">Clear local data</button></div>
     <div class="group" style="margin-top:14px"><button class="grow red" data-act="signout">Sign out</button></div>
     <p class="gf">Signed in as ${esc(u.email)} · demo session kept on this device only.</p></div>`;
   const back = `<button class="ibtn" data-act="pv-root">${ICON.chevL}Profile</button>`;
+  if (pv === 'provider' && API.server) return renderAdminProvider(back);
   if (pv === 'provider') {
     const provs = [['mock', 'Mock provider', 'Generated tracks, sample fleet'], ['kpler', 'Kpler / MarineTraffic', 'Global coastal + satellite · paid credits'], ['spire', 'Kpler / Spire Maritime', 'Global, strong satellite · paid contract'], ['datalastic', 'Datalastic', 'Global · monthly credit plans'], ['vesselfinder', 'VesselFinder API', 'Global · limited history · paid credits']];
     const cached = LIVE.reduce((s, a) => s + a.stats.clean, 0);
@@ -496,6 +497,35 @@ function renderProfilePage() {
     <div class="gh">Data sources (production)</div><div class="group">${grow('AIS positions', 'Kpler · Spire · Datalastic · VesselFinder')}${grow('Sanctions', 'OFAC SDN · EU · UK · OpenSanctions')}${grow('Ports', 'World Port Index (NGA)')}${grow('Cross-checks', 'Global Fishing Watch events · GPSJam')}</div>
     <p class="gf">Every vessel is keyed on its IMO number. Every paid position is cached once. No scraping of provider websites. Draught-based flags are indicators, not proof.</p></div>`;
   return '';
+}
+
+/* ------------------------------------- admin (server mode) ------------------------------------- */
+const PROVS = [['mock', 'Mock provider', 'Generated tracks, sample fleet, no credits'], ['datalastic', 'Datalastic', 'Global · monthly credit plans · key from datalastic.com'], ['kpler', 'Kpler / MarineTraffic', 'Global coastal + satellite · contract · adapter pending their answers']];
+function renderAdminProvider(back) {
+  const cfg = S.admin || {}; const isAdmin = (S.me && S.me.role) === 'admin';
+  if (!S.admin) API.adminConfig().then(c => { S.admin = c; if (S.page === 'profile' && S.pview === 'provider') renderPage('profile'); }).catch(e => { S.admin = { error: e.message }; renderPage('profile'); });
+  const fp = S.firstPull || {};
+  return `${topbar('AIS provider', back)}<div class="content"><h1 class="largetitle">AIS provider</h1><p class="sub">${isAdmin ? 'Everything here runs on the server. Paste the key once; it is stored on the server, never on this phone.' : 'Only an admin token can change the provider. Ask your administrator.'}</p>
+    ${cfg.error ? `<div class="hint">${esc(cfg.error)}</div>` : ''}
+    <div class="gh">Active</div><div class="group">${grow('Provider', esc((cfg.active || (S.me && S.me.provider) || '…').split(' (')[0]))}${grow('Credits used since restart', cfg.credits_used ?? '—')}${grow('Track fetches since restart', cfg.fetches_this_run ?? '—', '', cfg.active && cfg.active.startsWith('Mock') ? 'free on the mock provider' : 'each one is paid')}${grow('Database', cfg.database === undefined ? '—' : cfg.database ? 'PostGIS' : 'in-memory (dev)')}</div>
+    ${isAdmin ? `<div class="gh">Switch provider</div><div class="group">${PROVS.map(([k, l, d]) => `<button class="grow" data-act="adm-provider" data-id="${k}"><div class="lbl"><b>${l}</b><span>${d}${cfg.keys && cfg.keys[k] ? ' · key ' + esc(cfg.keys[k]) : ''}</span></div>${cfg.provider === k ? `<span class="check">${ICON.check}</span>` : ''}</button>`).join('')}</div>
+    <div class="gh">API key for ${esc((PROVS.find(p => p[0] === (S.admKey || cfg.provider)) || PROVS[1])[1])}</div><div class="group"><div class="grow"><div class="lbl"><b>Key</b></div><input type="password" id="admkey" placeholder="${cfg.keys && cfg.keys[S.admKey || cfg.provider] ? 'stored: ' + esc(cfg.keys[S.admKey || cfg.provider]) : 'paste key'}" autocomplete="off" autocapitalize="off" spellcheck="false"></div><button class="grow" data-act="adm-savekey"><div class="lbl"><b style="color:var(--accent)">Save key and switch</b></div></button><button class="grow" data-act="adm-test"><div class="lbl"><b style="color:var(--accent)">Test connection</b><span>One cheap search call; shows credits used</span></div></button></div>
+    ${S.admTest ? `<div class="hint">${esc(S.admTest)}</div>` : ''}
+    <div class="gh">First pull (acceptance check)</div><div class="group"><div class="grow"><div class="lbl"><b>IMO numbers</b><span>Up to 10, separated by spaces or commas</span></div></div><div style="padding:0 16px 12px"><textarea class="notebox" id="fpimos" placeholder="9000036 9000014" style="min-height:56px">${esc(fp.input || '')}</textarea></div><button class="grow" data-act="adm-firstpull"><div class="lbl"><b style="color:var(--accent)">${fp.running ? 'Running…' : 'Run first pull'}</b><span>Fetches 12 months per ship (paid on a real provider), then checks positions, draught, port calls, voyages, cache</span></div></button></div>
+    ${fp.results ? fp.results.map(r => `<div class="flag ${r.ok ? 'info' : 'medium'}"><div class="fh"><span class="pill ${r.ok ? 'ok' : 'medium'}">${r.ok ? 'OK' : 'CHECK'}</span><span class="ft">${r.imo}${r.name ? ' · ' + esc(r.name) : ''}</span></div>${r.error ? `<ul class="fl"><li>${esc(r.error)}</li></ul>` : `<ul class="fl">${Object.entries(r.checks).map(([k, v]) => `<li>${v ? '✓' : '✗'} ${esc(k)}</li>`).join('')}<li class="mono" style="font-size:11px">${r.stats.clean} clean of ${r.stats.raw} raw · ${r.stats.port_calls} calls · ${r.stats.voyages} voyages · ${r.stats.flags} flags (${r.sev.high} high) · ${esc(r.status)}</li></ul>`}</div>`).join('') : ''}
+    <div class="gh">Jobs</div><div class="group"><button class="grow" data-act="adm-refresh"><div class="lbl"><b style="color:var(--accent)">Refresh watched vessels now</b><span>Same as the 30-minute job: new tail of positions, new flags become alerts</span></div></button><button class="grow" data-act="adm-sanctions"><div class="lbl"><b style="color:var(--accent)">Refresh sanctions lists now</b><span>OFAC, EU, UK (needs the database)</span></div></button></div>` : ''}
+    <p class="gf">Switching provider keeps every position already stored; only new fetches use the new source.</p></div>`;
+}
+async function adminAction(act, b) {
+  const key = () => ($('#admkey') ? $('#admkey').value.trim() : '');
+  try {
+    if (act === 'adm-provider') { S.admKey = b.dataset.id; if (b.dataset.id === 'mock' || (S.admin && S.admin.keys && S.admin.keys[b.dataset.id])) { await API.adminProvider(b.dataset.id, key() || null); toast('Provider switched'); S.admin = null; } renderPage('profile'); }
+    else if (act === 'adm-savekey') { const p = S.admKey || (S.admin && S.admin.provider) || 'datalastic'; if (p !== 'mock' && !key()) { toast('Paste the key first'); return; } await API.adminProvider(p, key() || null); toast('Key saved on the server'); S.admin = null; renderPage('profile'); }
+    else if (act === 'adm-test') { S.admTest = 'Testing…'; renderPage('profile'); const r = await API.adminTest(); S.admTest = r.ok ? `OK · ${r.provider} · ${r.matches} matches for “MAERSK” (${(r.sample || []).join(', ') || 'none'}) · ${r.credits_used} credits used · ${r.ms} ms` : `Failed: ${r.error}`; S.admin = null; renderPage('profile'); }
+    else if (act === 'adm-firstpull') { const txt = ($('#fpimos') ? $('#fpimos').value : ''); const imos = (txt.match(/\d{7}/g) || []).slice(0, 10).map(Number); if (!imos.length) { toast('Type at least one 7-digit IMO'); return; } S.firstPull = { input: txt, running: true }; renderPage('profile'); const res = await API.adminFirstPull(imos); S.firstPull = { input: txt, results: res }; S.admin = null; renderPage('profile'); }
+    else if (act === 'adm-refresh') { toast('Refreshing…'); const r = await API.jobsRefresh(); toast(`${r.vessels} vessels · ${r.new_alerts} new alerts · ${r.fetches} fetches`); }
+    else if (act === 'adm-sanctions') { toast('Refreshing lists…'); const r = await API.jobsSanctions(); toast('Sanctions: ' + JSON.stringify(r).slice(0, 120)); }
+  } catch (e) { toast('Failed: ' + e.message); if (S.firstPull) S.firstPull.running = false; renderPage('profile'); }
 }
 
 /* ------------------------------------- web push ------------------------------------- */
@@ -627,6 +657,7 @@ function pageAction(act, b) {
   else if (act === 'go-vessels') { S.vseg = 'watch'; showPage('vessels'); }
   else if (act === 'edit-name' || act === 'edit-org' || act === 'edit-role') { const u = store.get('user', {}); const key = act.slice(5); const cur = u[key] || ''; const el = b.querySelector('.val') || b.querySelector('.lbl'); el.innerHTML = `<input type="text" id="edit" value="${esc(cur)}" style="text-align:right;border:0;background:var(--fill);border-radius:8px;padding:4px 8px;width:160px;color:var(--fg)">`; const inp = el.querySelector('input'); inp.focus(); const done = () => { u[key] = inp.value.trim() || cur; store.set('user', u); renderPage('profile'); }; inp.addEventListener('blur', done, { once: true }); inp.addEventListener('keydown', e => { if (e.key === 'Enter') inp.blur(); }); }
   else if (act === 'cleardata') { ['watch', 'notes', 'reports', 'alertsSeen'].forEach(k => store.del(k)); toast('Local data cleared'); renderPage('profile'); updateBadge(); }
+  else if (act.startsWith('adm-')) adminAction(act, b);
   else if (act === 'push') togglePush();
   else if (act === 'signout') signOut();
   else if (act === 'provider') { SET.provider = b.dataset.id; saveSettings(); renderPage('profile'); toast(SET.provider === 'mock' ? 'Mock provider active' : providerLabel() + ' selected · needs a key and hosting'); }
@@ -646,7 +677,7 @@ function loadFleet(done) {
   let i = 0; const loading = $('#loading');
   if (API.server) {
     loading.hidden = false; loading.textContent = 'Loading fleet from server…';
-    API.me().then(me => { if (Array.isArray(me.watchlist)) store.set('watch', me.watchlist); S.push = me.push || {}; }).catch(() => {});
+    API.me().then(me => { S.me = me; if (Array.isArray(me.watchlist)) store.set('watch', me.watchlist); S.push = me.push || {}; }).catch(() => {});
     API.fleet().then(list => { for (const j of list) { const a = API.hydrate(j); ANALYSIS.set(a.v.imo, a); BY_IMO[a.v.imo] = a.v; const k = LIVE.findIndex(x => x.v.imo === a.v.imo); if (k >= 0) LIVE[k] = a; else LIVE.push(a); } loading.hidden = true; S.loading = false; if (S.page === 'chart') { Chart.draw(); renderSheet(); } done(); })
       .catch(err => { loading.textContent = 'Server unavailable: ' + err.message; console.error(err); });
     return;

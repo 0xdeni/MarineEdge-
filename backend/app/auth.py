@@ -20,19 +20,32 @@ from fastapi import HTTPException, Request
 log = logging.getLogger("marineedge.auth")
 
 
+ROLES: dict[str, str] = {}   # name -> role, filled by _tokens()
+
+
 def _tokens() -> dict[str, str]:
+    """API_TOKENS="deni:9f3a…:admin,ana:77c1…"  → {token: name}; role per name in ROLES (analyst by default)."""
     raw = os.environ.get("API_TOKENS", "").strip()
     out: dict[str, str] = {}
     for part in raw.split(","):
         part = part.strip()
         if not part:
             continue
-        name, _, tok = part.partition(":")
-        if tok:
-            out[tok.strip()] = name.strip()
+        bits = part.split(":")
+        if len(bits) >= 2:
+            name, tok = bits[0].strip(), bits[1].strip()
+            ROLES[name] = bits[2].strip().lower() if len(bits) > 2 and bits[2].strip() else "analyst"
+            out[tok] = name
         else:
-            out[name] = "token"
+            out[bits[0]] = "token"
+            ROLES["token"] = "analyst"
     return out
+
+
+def role_of(name: str) -> str:
+    if name in ("open", "health"):
+        return "admin"            # no tokens configured: dev mode, everything allowed
+    return ROLES.get(name, "analyst")
 
 
 def enabled() -> bool:
@@ -63,4 +76,11 @@ async def require_token(request: Request) -> str:
     if who is None:
         raise HTTPException(status_code=401, detail="missing or invalid API token", headers={"WWW-Authenticate": "Bearer"})
     request.state.user = who
+    return who
+
+
+async def require_admin(request: Request) -> str:
+    who = getattr(request.state, "user", None) or identify(request) or "open"
+    if role_of(who) != "admin":
+        raise HTTPException(status_code=403, detail="admin token required")
     return who

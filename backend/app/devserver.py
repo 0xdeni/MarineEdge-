@@ -67,7 +67,10 @@ class H(SimpleHTTPRequestHandler):
             if p == "/api/rules":
                 return self._json(dict(svc.rules))
             if p == "/api/me":
-                return self._json({"user": USER, "watchlist": svc.store.get_watchlist(USER), "push": {"configured": False, "publicKey": ""}})
+                return self._json({"user": USER, "role": "admin", "watchlist": svc.store.get_watchlist(USER), "push": {"configured": False, "publicKey": ""}, "provider": getattr(svc.provider, "name", "?")})
+            if p == "/api/admin/config":
+                from app import settings_store
+                return self._json({**settings_store.public_view(), "active": getattr(svc.provider, "name", "?"), "credits_used": getattr(svc.provider, "credits_used", 0), "fetches_this_run": svc.fetches, "database": False, "push": False, "auth": "open"})
             if p.startswith("/api/me/notes/"):
                 return self._json(svc.store.get_notes(USER, int(p.split("/")[4])))
             if p == "/api/alerts":
@@ -109,6 +112,20 @@ class H(SimpleHTTPRequestHandler):
         if p == "/api/jobs/refresh":
             from app.jobs import refresh
             return self._json(refresh(svc))
+        if p == "/api/admin/provider":
+            try:
+                return self._json(svc.set_provider(body.get("provider", "mock"), body.get("api_key")))
+            except Exception as e:  # noqa: BLE001
+                return self._json({"error": str(e)[:300]}, 400)
+        if p == "/api/admin/test":
+            try:
+                return self._json(svc.test_provider())
+            except Exception as e:  # noqa: BLE001
+                return self._json({"ok": False, "error": str(e)[:300]})
+        if p == "/api/admin/first-pull":
+            return self._json(svc.first_pull([int(i) for i in body.get("imos", [])][:10]))
+        if p == "/api/jobs/sanctions":
+            return self._json({"error": "sanctions refresh needs DATABASE_URL (PostGIS)"}, 400)
         if p == "/api/rules/reload":
             return self._json(dict(svc.reload_rules()))
         return self._json({"error": "not found"}, 404)

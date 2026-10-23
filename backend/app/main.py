@@ -12,7 +12,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 
 from app import push
-from app.auth import enabled as auth_enabled, require_token
+from app.auth import enabled as auth_enabled, require_admin, require_token, role_of
 from app.providers.base import CreditsExhausted, ProviderError
 from app.service import Service, analysis_json, vessel_json
 
@@ -115,7 +115,54 @@ def _user(request: Request) -> str:
 @app.get("/api/me")
 def me(request: Request):
     u = _user(request)
-    return {"user": u, "watchlist": svc.store.get_watchlist(u), "push": {"configured": push.configured(), "publicKey": push.public_key()}}
+    return {"user": u, "role": role_of(u), "watchlist": svc.store.get_watchlist(u), "push": {"configured": push.configured(), "publicKey": push.public_key()},
+            "provider": getattr(svc.provider, "name", "?")}
+
+
+# ---------------------------------------------------------------- admin (operable from the phone)
+@app.get("/api/admin/config", dependencies=[Depends(require_admin)])
+def admin_config():
+    from app import settings_store
+    return {**settings_store.public_view(), "active": getattr(svc.provider, "name", "?"), "credits_used": getattr(svc.provider, "credits_used", 0),
+            "fetches_this_run": svc.fetches, "rules": dict(svc.rules), "zones": [{"id": z.id, "name": z.name, "enabled": z.enabled} for z in svc.ref.zones],
+            "database": bool(os.environ.get("DATABASE_URL")), "push": push.configured(), "auth": "token" if auth_enabled() else "open"}
+
+
+class ProviderBody(BaseModel):
+    provider: str
+    api_key: Optional[str] = None
+
+
+@app.post("/api/admin/provider", dependencies=[Depends(require_admin)])
+def admin_provider(body: ProviderBody):
+    if body.provider not in ("mock", "datalastic", "kpler"):
+        raise HTTPException(400, "provider must be mock, datalastic or kpler")
+    try:
+        return svc.set_provider(body.provider, body.api_key)
+    except ProviderError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.post("/api/admin/test", dependencies=[Depends(require_admin)])
+def admin_test():
+    return svc.test_provider()
+
+
+class FirstPull(BaseModel):
+    imos: list[int]
+
+
+@app.post("/api/admin/first-pull", dependencies=[Depends(require_admin)])
+def admin_first_pull(body: FirstPull):
+    return svc.first_pull(body.imos[:10])
+
+
+@app.post("/api/jobs/sanctions", dependencies=[Depends(require_admin)])
+def jobs_sanctions():
+    if not os.environ.get("DATABASE_URL"):
+        raise HTTPException(400, "sanctions refresh needs DATABASE_URL (PostGIS)")
+    from app.sanctions.loader import refresh_all
+    return refresh_all(os.environ["DATABASE_URL"], uk_csv_url=os.environ.get("UK_SANCTIONS_CSV_URL"), include_opensanctions=os.environ.get("OPENSANCTIONS", "") == "1")
 
 
 class Watchlist(BaseModel):

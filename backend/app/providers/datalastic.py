@@ -33,13 +33,19 @@ class DatalasticProvider:
         self.credits_used = 0
 
     # ---- http ----
+    def _redact(self, text: str) -> str:
+        return text.replace(self.key, "***") if self.key else text
+
     def _get(self, path: str, credits: int, **params) -> dict:
         params["api-key"] = self.key
-        r = self.http.get(f"{BASE}/{path}", params=params, timeout=60)
+        try:
+            r = self.http.get(f"{BASE}/{path}", params=params, timeout=60)
+        except requests.RequestException as e:
+            raise ProviderError(f"Datalastic unreachable on {path}: {self._redact(str(e))[:200]}") from e
         if r.status_code == 402 or r.status_code == 429:
-            raise CreditsExhausted(f"Datalastic {r.status_code}: {r.text[:200]}")
+            raise CreditsExhausted(f"Datalastic {r.status_code}: {self._redact(r.text[:200])}")
         if r.status_code >= 400:
-            raise ProviderError(f"Datalastic {r.status_code} on {path}: {r.text[:200]}")
+            raise ProviderError(f"Datalastic {r.status_code} on {path}: {self._redact(r.text[:200])}")
         self.credits_used += credits
         log.info("datalastic %s credits≈%d total≈%d", path, credits, self.credits_used)
         return r.json()

@@ -17,7 +17,7 @@ const API = {
   },
   async send(method, path, body) {
     const r = await fetch(this.cfg.apiBase + path, { method, headers: { ...this.headers(), 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) });
-    if (!r.ok) throw new Error(`${r.status} ${path}`);
+    if (!r.ok) { let d = ''; try { const j = await r.json(); d = j.detail || j.error || ''; } catch (e) {} throw new Error(d || `${r.status} ${path}`); }
     return r.status === 204 ? null : r.json();
   },
   me() { return this.get('/api/me'); },
@@ -27,6 +27,12 @@ const API = {
   alerts(days = 14) { return this.get(`/api/alerts?days=${days}`); },
   pushSubscribe(sub) { return this.send('POST', '/api/push/subscribe', sub); },
   pushUnsubscribe(sub) { return this.send('DELETE', '/api/push/subscribe', sub); },
+  adminConfig() { return this.get('/api/admin/config'); },
+  adminProvider(provider, api_key) { return this.send('POST', '/api/admin/provider', { provider, api_key: api_key || null }); },
+  adminTest() { return this.send('POST', '/api/admin/test'); },
+  adminFirstPull(imos) { return this.send('POST', '/api/admin/first-pull', { imos }); },
+  jobsSanctions() { return this.send('POST', '/api/jobs/sanctions'); },
+  jobsRefresh() { return this.send('POST', '/api/jobs/refresh'); },
   search(q) { return this.get('/api/vessels/search?q=' + encodeURIComponent(q)); },
   analysis(imo) { return this.get(`/api/vessels/${imo}/analysis`); },
   fleet() { return this.get('/api/fleet'); },
