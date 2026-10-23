@@ -4,6 +4,7 @@
                                   tail of positions), turn new flags into alerts, push them
   python -m app.jobs sanctions    daily: refresh the sanctions lists (same as app.cli sanctions-refresh)
   python -m app.jobs region       optional: warm the live region views (costs one area query per region)
+  python -m app.jobs prune-live   daily: tiered retention for the recorded free feed (rules.live); --all for a full pass
 
 Everything goes through Service, so the cache rule and the provider adapter apply as in the API."""
 from __future__ import annotations
@@ -82,6 +83,15 @@ def region(svc: Service | None = None) -> dict:
     return counts
 
 
+def prune_live(full: bool = False) -> dict:
+    """Tiered retention for the recorded free feed; thresholds from rules.live. `full` thins the whole old table."""
+    from app.engine import load_rules
+    from app.store import make_store
+    live = load_rules().get("live", {}) or {}
+    store = make_store()
+    return store.live_prune(int(live.get("full_res_days", 30)), int(live.get("thin_minutes", 15)), int(live.get("retention_months", 14)), window_days=None if full else 3)
+
+
 def main(argv: list[str]) -> int:
     cmd = argv[0] if argv else "refresh"
     t0 = time.time()
@@ -92,6 +102,8 @@ def main(argv: list[str]) -> int:
         print(json.dumps(refresh_all(os.environ["DATABASE_URL"], uk_csv_url=os.environ.get("UK_SANCTIONS_CSV_URL"), include_opensanctions=os.environ.get("OPENSANCTIONS", "") == "1")))
     elif cmd == "region":
         print(json.dumps(region()))
+    elif cmd == "prune-live":
+        print(json.dumps(prune_live(full=("--all" in argv))))
     else:
         print(__doc__)
         return 2

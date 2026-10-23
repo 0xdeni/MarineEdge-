@@ -75,6 +75,7 @@
 {% if notes %}<h2>Analyst notes</h2>{% for n in notes %}<p><b>V{{ n.voyage_n }}</b> · {{ n.text }}</p>{% endfor %}{% endif %}
 
 <div class="foot">Pipeline: {{ a.stats.raw|n }} raw positions → {{ a.stats.clean|n }} clean ({{ a.stats.dup }} duplicates, {{ a.stats.bad }} bad fixes dropped) → {{ a.stats.port_calls }} port calls → {{ a.stats.voyages }} voyages → {{ a.stats.flags }} flags.
+{% if a.stats.source %}Positions: {{ a.stats.source }}.{% endif %}{% if a.stats.history_since %} Recorded history starts {{ a.stats.history_since|dy }}; nothing before that date is known from this feed, and coastal receivers do not cover open sea — gaps there are marked "outside receiver coverage".{% endif %}
 Draught-based flags rely on crew-entered values and AIS can be spoofed: flags are reasons to look, not verdicts. Thresholds from config/rules.yaml.</div>
 </body>
 </html>

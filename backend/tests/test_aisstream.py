@@ -77,15 +77,16 @@ def test_memory_store_live_roundtrip():
 
 def test_recorder_bookkeeping_and_provider():
     st = MemoryStore()
-    rec = Recorder(st)
+    rec = Recorder(st, rules=RULES)
     rec.warm()
     rec.handle(STATIC)                                        # static first → map entry, draught known
     rec.handle(POS)
     rec.handle({**POS, "MetaData": {**POS["MetaData"], "time_utc": "2026-10-20 11:56:52 +0000 UTC"}})
-    assert rec.counts == {"pos": 2, "static": 1, "written": 0, "dropped": 0} and len(rec.buf) == 2
+    assert rec.counts["received"] == 2 and rec.counts["stored"] == 2 and rec.counts["static"] == 1 and len(rec.buf) == 2
     assert rec.buf[0]["imo"] == 9100001 and rec.buf[0]["draught"] == 11.2   # enriched from the static message
     rec.flush()
     assert rec.counts["written"] == 2 and not rec.buf
+    assert st.live_coverage(days=36500)[cell_of(28.9912, 41.0201)] == 2       # both fixes counted in their cell
 
     pv = OwnAISProvider(st)
     assert pv.get_track(9100001, T_POS - 1, T_POS + H)[0].draught == 11.2
@@ -128,3 +129,46 @@ def test_gfw_event_normalisation():
     g = normalise_event({"type": "gap", "start": "2026-03-04T05:00:00Z", "end": None, "gap": {"distanceKm": 120.4, "durationHours": 30, "intentionalDisabling": True}})
     assert g["label"] == "AIS off" and g["t1"] is None and "likely intentional" in g["detail"]
     assert normalise_event({})["label"] == "event"
+
+
+def test_recorder_volume_policy():
+    """One fix per ship per min_interval_s; ships outside keep_types dropped once their type is known;
+    every received fix still counts for coverage."""
+    from app.engine.rules_config import Rules
+    st = MemoryStore()
+    rec = Recorder(st, rules=Rules({"live": {"min_interval_s": 120, "keep_types": ["70-89"]}}))
+    assert rec.keeps(None) and rec.keeps(80) and rec.keeps(70) and not rec.keeps(30) and not rec.keeps(60)
+    from datetime import datetime, timedelta, timezone
+    base = datetime(2026, 10, 20, 11, 46, 52, tzinfo=timezone.utc)
+    for sec in (0, 30, 90, 125, 200, 250):                     # 6 reports in 250 s → 3 stored (0, 125, 250)
+        rec.handle({**POS, "MetaData": {**POS["MetaData"], "time_utc": (base + timedelta(seconds=sec)).strftime("%Y-%m-%d %H:%M:%S") + " +0000 UTC"}})
+    assert rec.counts["received"] == 6 and rec.counts["stored"] == 3 and rec.counts["sampled_out"] == 3
+    # a ferry (type 60) announces itself: from now on its positions are filtered, coverage still counted
+    ferry_static = {**STATIC, "MetaData": {**STATIC["MetaData"], "MMSI": 271000001}, "Message": {"ShipStaticData": {**STATIC["Message"]["ShipStaticData"], "UserID": 271000001, "ImoNumber": 9200002, "Type": 60}}}
+    rec.handle(ferry_static)
+    rec.handle({**POS, "MetaData": {**POS["MetaData"], "MMSI": 271000001, "time_utc": "2026-10-20 12:00:00 +0000 UTC"}})
+    assert rec.counts["filtered"] == 1 and rec.counts["stored"] == 3 and rec.counts["received"] == 7
+    rec.flush()
+    assert st.live_stats()["positions"] == 3
+    assert sum(st.live_coverage(days=36500).values()) == 7
+    # unknown message types are counted, never raise
+    rec.handle({"MessageType": "BaseStationReport", "MetaData": {"MMSI": 2}, "Message": {}})
+    assert rec.counts["unparsed"] == 1
+
+
+def test_live_prune_tiers():
+    import time as _t
+    st = MemoryStore()
+    now = int(_t.time() * 1000)
+    day, minute = 86_400_000, 60_000
+    rows = []
+    for i in range(30):                                        # 60 days old: 30 fixes 2 min apart → one per 15 min = 4 kept
+        rows.append({"mmsi": 1, "t": now - 60 * day + i * 2 * minute, "lat": 41.0, "lon": 29.0, "sog": 10.0, "cog": 0.0, "heading": None, "nav": 0, "draught": None, "imo": None})
+    for i in range(10):                                        # yesterday: full resolution kept
+        rows.append({"mmsi": 1, "t": now - day + i * 2 * minute, "lat": 41.0, "lon": 29.0, "sog": 10.0, "cog": 0.0, "heading": None, "nav": 0, "draught": None, "imo": None})
+    rows.append({"mmsi": 1, "t": now - 500 * day, "lat": 41.0, "lon": 29.0, "sog": 0.0, "cog": 0.0, "heading": None, "nav": 1, "draught": None, "imo": None})   # beyond retention
+    st.live_put(rows)
+    r = st.live_prune(full_res_days=30, thin_minutes=15, retention_months=14)
+    assert r["deleted"] == 1 and r["thinned"] == 26
+    kept = sorted(st.live[1])
+    assert len(kept) == 14 and len([t for t in kept if t < now - 30 * day]) == 4

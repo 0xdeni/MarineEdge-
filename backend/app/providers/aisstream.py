@@ -100,6 +100,8 @@ def cell_of(lon: float, lat: float) -> tuple[int, int]:
 class OwnAISProvider:
     """Serves everything from positions this server recorded. No credits, ever."""
     name = "Recorded AIS (aisstream.io, own receivers feed)"
+    credits_used = 0      # the Service logs last_credits per fetch; here every fetch is free
+    last_credits = 0
 
     def __init__(self, store):
         self.store = store

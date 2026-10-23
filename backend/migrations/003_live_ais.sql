@@ -38,5 +38,16 @@ CREATE TABLE IF NOT EXISTS mmsi_map (
 CREATE INDEX IF NOT EXISTS idx_mmsi_map_imo ON mmsi_map (imo);
 CREATE INDEX IF NOT EXISTS idx_mmsi_map_name ON mmsi_map (upper(name));
 
--- Drop raw live rows older than 14 months (the analysis window is 12) to keep the table bounded.
--- Run from cron: DELETE FROM ais_live WHERE ts < now() - interval '14 months';
+-- Receiver coverage: every position report received (before downsampling and type filtering) counts
+-- one fix in its 0.5° cell for that day. The AIS-gap rule reads the last 30 days of this table.
+CREATE TABLE IF NOT EXISTS coverage_cells (
+  cx    INTEGER NOT NULL,     -- floor(lon / 0.5)
+  cy    INTEGER NOT NULL,     -- floor(lat / 0.5)
+  day   DATE NOT NULL,
+  fixes BIGINT NOT NULL DEFAULT 0,
+  PRIMARY KEY (cx, cy, day)
+);
+
+-- Retention is a job, not a cron SQL line: `python -m app.jobs prune-live` thins rows older than
+-- rules.live.full_res_days to one per ship per rules.live.thin_minutes and deletes rows older than
+-- rules.live.retention_months. Daily from deploy/cron.d-marineedge.

@@ -153,6 +153,12 @@ class Service:
 
         cov = getattr(self.provider, "coverage", None)
         a = analyze(v, self.track(imo), self.ref, self.rules, now=self._now(), vessels_near=near, destination=st.destination, eta=st.eta, coverage=cov)
+        a.stats["source"] = getattr(self.provider, "name", "provider")
+        if cov is not None:                       # recorded feed: history cannot start before the recorder did
+            try:
+                a.stats["history_since"] = (self.provider.stats() or {}).get("oldest")
+            except Exception:  # noqa: BLE001
+                a.stats["history_since"] = None
         try:
             self.store.save_analysis(a)
         except Exception:  # the analysis is still served if the DB write fails

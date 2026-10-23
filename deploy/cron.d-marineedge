@@ -2,4 +2,4 @@
 0 3 * * * root /opt/marineedge/deploy/backup.sh >> /var/log/marineedge-backup.log 2>&1
 30 4 * * * root cd /opt/marineedge && docker compose exec -T api python -m app.jobs sanctions >> /var/log/marineedge-sanctions.log 2>&1
 */30 * * * * root cd /opt/marineedge && docker compose exec -T api python -m app.jobs refresh >> /var/log/marineedge-refresh.log 2>&1
-15 3 * * 0 root cd /opt/marineedge && docker compose exec -T db psql -q -U vvt -d vvt -c "DELETE FROM ais_live WHERE ts < now() - interval '14 months'" >> /var/log/marineedge-prune.log 2>&1
+40 3 * * * root cd /opt/marineedge && docker compose exec -T api python -m app.jobs prune-live >> /var/log/marineedge-prune.log 2>&1

@@ -16,7 +16,7 @@ Short version: **everything in MarineEdge can run at €0/month from day one.** 
 
 ## How the free AIS path behaves (so nobody is surprised)
 
-1. **Day 0:** paste the aisstream key in the app. Within minutes "Recorded AIS" on the admin screen shows positions arriving (expect 1–3 M positions/day across both regions; ~0.5 GB/month in PostGIS with the indexes, pruned after 14 months).
+1. **Day 0:** paste the aisstream key in the app. Within a minute "Recorded AIS" on the admin screen shows positions arriving. The raw feed for both regions is 10–25 M messages a day, so the recorder applies the policy in `rules.yaml › live`: one stored fix per ship per 2 minutes, only cargo ships and tankers once their type is known (ferries, fishing boats, tugs and yachts are dropped — but still counted for receiver coverage), full resolution for 30 days, then one fix per 15 minutes, deleted after 14 months. Expect roughly 15 GB of PostGIS per year; a Hetzner CX22 (40 GB) is fine for the first year, Oracle Always Free (200 GB) for the long run.
 2. **Week 1:** search works for every ship that broadcast its static data (name, IMO, call sign, destination, draught). Voyages exist from the first port call you recorded. Red flags are computed on what you have; the AIS-gap rule knows where your receivers can't hear (0.5° cells with < `coverage_min_fixes` fixes in 30 days) and labels gaps there **Info · outside receiver coverage** instead of Medium/High. Gaps longer than `coverage_max_hours` (72 h) are flagged regardless.
 3. **Month 1–12:** history fills in; everything the brief asks for is there for ships that stayed in receiver range. For a ship you *must* fix completely (court case, counterparty check), switch the provider to Datalastic for one **first pull** of its 12 months — that single purchase is cached and the switch back costs nothing.
 4. **What you never get for free:** what a ship did last year, and where it went when it was 200 nm offshore. Those two are exactly what Datalastic/Kpler sell; buy them per ship, not per month.
@@ -33,6 +33,12 @@ Short version: **everything in MarineEdge can run at €0/month from day one.** 
 ais_gap:
   coverage_min_fixes: 50     # fewer fixes than this in a 0.5° cell over 30 days = no receiver there
   coverage_max_hours: 72     # gaps longer than this are flagged even without coverage
+live:
+  min_interval_s: 120        # one stored fix per ship per 2 minutes
+  keep_types: ["70-89"]      # cargo + tanker once the type is known; unknown types kept
+  full_res_days: 30          # then thinned to one fix per thin_minutes by the daily prune-live job
+  thin_minutes: 15
+  retention_months: 14
 ```
 
 ## Owner steps (iPhone only)

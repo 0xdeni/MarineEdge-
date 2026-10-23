@@ -28,7 +28,7 @@ The server pulls every new commit from GitHub within 10 minutes (`AUTO_UPDATE=1`
 
 ## 3. What runs on the server
 
-`install.sh` installs Docker, clones the repo to `/opt/marineedge`, writes `.env` (random database password, your admin token, push keys), and starts five containers: PostGIS, the API, the **recorder** (one websocket to aisstream.io, idle until a key is pasted in the app), the web app, and Caddy (automatic HTTPS). Cron runs the nightly backup (03:00), the sanctions refresh (04:30), the watchlist refresh (every 30 min), the auto-update (every 10 min) and a weekly prune of raw live positions older than 14 months. Logs: `/var/log/marineedge-*.log`; recorder logs with `docker compose logs -f recorder`.
+`install.sh` installs Docker, clones the repo to `/opt/marineedge`, writes `.env` (random database password, your admin token, push keys), and starts five containers: PostGIS, the API, the **recorder** (one websocket to aisstream.io, idle until a key is pasted in the app), the web app, and Caddy (automatic HTTPS). Cron runs the nightly backup (03:00), the sanctions refresh (04:30), the watchlist refresh (every 30 min), the auto-update (every 10 min) and the daily `prune-live` job (thins recorded positions older than 30 days to one per 15 minutes, deletes them after 14 months — all three numbers in `rules.yaml › live`). Logs: `/var/log/marineedge-*.log`; recorder logs with `docker compose logs -f recorder`.
 
 ## 4. With a terminal (optional)
 

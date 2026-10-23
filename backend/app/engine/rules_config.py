@@ -21,6 +21,8 @@ DEFAULTS: dict[str, Any] = {
     "identity": {"medium_if_more_than": 1},
     "sanctions": {"lookback_months": 12, "lists": ["OFAC SDN", "EU", "UK"]},
     "history_months": 12,
+    # free live feed (aisstream) recording policy; thresholds, not code
+    "live": {"min_interval_s": 120, "keep_types": ["70-89"], "full_res_days": 30, "thin_minutes": 15, "retention_months": 14},
 }
 
 

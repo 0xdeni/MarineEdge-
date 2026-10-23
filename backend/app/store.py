@@ -33,7 +33,9 @@ class Store(Protocol):
     def live_latest(self, bbox: tuple[float, float, float, float]) -> list[dict]: ...
     def live_near(self, lat: float, lon: float, radius_m: float, t0: int, t1: int) -> list[dict]: ...
     def live_search(self, q: str) -> list[dict]: ...
+    def coverage_add(self, rows: list[tuple[int, int, int, int]]) -> None: ...   # (cx, cy, day_epoch_s, fixes)
     def live_coverage(self, days: int = 30) -> dict[tuple[int, int], int]: ...
+    def live_prune(self, full_res_days: int, thin_minutes: int, retention_months: int, window_days: int = 3) -> dict: ...
     def live_stats(self) -> dict: ...
     def mmsi_upsert(self, row: dict) -> None: ...
     def mmsi_by_imo(self, imo: int) -> list[dict]: ...
@@ -71,6 +73,7 @@ class MemoryStore:
         self.subs: dict[str, dict] = {}
         self.live: dict[int, dict[int, dict]] = {}       # mmsi -> {t: row}
         self.mmsi: dict[int, dict] = {}
+        self.cov: dict[tuple[int, int, int], int] = {}    # (cx, cy, day) -> fixes
 
     def covered(self, imo, start_ms, end_ms):
         return _chain_covers(self.windows.get(imo, []), start_ms, end_ms)
@@ -164,22 +167,45 @@ class MemoryStore:
         qu = q.upper()
         return [m for m in self.mmsi.values() if qu in (m.get("name") or "").upper() or str(m.get("imo") or "").startswith(qu) or str(m["mmsi"]).startswith(qu)]
 
+    def coverage_add(self, rows):
+        for cx, cy, day, n in rows:
+            self.cov[(cx, cy, day)] = self.cov.get((cx, cy, day), 0) + n
+
     def live_coverage(self, days=30):
-        from app.providers.aisstream import cell_of
         import time as _t
-        since = int(_t.time() * 1000) - days * 86_400_000
+        since = int(_t.time()) // 86_400 * 86_400 - days * 86_400
         cov: dict[tuple[int, int], int] = {}
-        for pts in self.live.values():
-            for t, r in pts.items():
-                if t >= since:
-                    c = cell_of(r["lon"], r["lat"])
-                    cov[c] = cov.get(c, 0) + 1
+        for (cx, cy, day), n in self.cov.items():
+            if day >= since:
+                cov[(cx, cy)] = cov.get((cx, cy), 0) + n
         return cov
+
+    def live_prune(self, full_res_days, thin_minutes, retention_months, window_days=3):
+        import time as _t
+        now = int(_t.time() * 1000)
+        cutoff_del = now - int(retention_months * 30.4 * 86_400_000)
+        cutoff_thin = now - full_res_days * 86_400_000
+        deleted = thinned = 0
+        for mmsi, pts in self.live.items():
+            for t in [t for t in pts if t < cutoff_del]:
+                del pts[t]
+                deleted += 1
+            seen: set[int] = set()
+            for t in sorted(pts):
+                if t >= cutoff_thin:
+                    break
+                b = t // (thin_minutes * 60_000)
+                if b in seen:
+                    del pts[t]
+                    thinned += 1
+                else:
+                    seen.add(b)
+        return {"deleted": deleted, "thinned": thinned}
 
     def live_stats(self):
         n = sum(len(p) for p in self.live.values())
         ts = [t for p in self.live.values() for t in p]
-        return {"positions": n, "mmsi": len(self.live), "with_imo": sum(1 for m in self.mmsi.values() if m.get("imo")), "oldest": min(ts) if ts else None, "newest": max(ts) if ts else None}
+        return {"positions": n, "mmsi": len(self.mmsi) or len(self.live), "with_imo": sum(1 for m in self.mmsi.values() if m.get("imo")), "oldest": min(ts) if ts else None, "newest": max(ts) if ts else None}
 
     def mmsi_upsert(self, row):
         self.mmsi[row["mmsi"]] = {**self.mmsi.get(row["mmsi"], {}), **row}
@@ -388,16 +414,49 @@ class PostgresStore:
                              (f"%{qu}%", f"{qu}%", f"{qu}%")).fetchall()
         return [{"mmsi": r[0], "imo": r[1], "name": r[2], "callsign": r[3], "type_code": r[4], "destination": r[5], "draught": r[6]} for r in rows]
 
+    def coverage_add(self, rows):
+        if not rows:
+            return
+        with self._conn() as c:
+            with c.cursor() as cur:
+                cur.executemany("INSERT INTO coverage_cells (cx, cy, day, fixes) VALUES (%s, %s, to_timestamp(%s)::date, %s) "
+                                "ON CONFLICT (cx, cy, day) DO UPDATE SET fixes = coverage_cells.fixes + EXCLUDED.fixes", rows)
+            c.commit()
+
     def live_coverage(self, days=30):
         with self._conn() as c:
-            rows = c.execute("SELECT floor(lon/0.5)::int, floor(lat/0.5)::int, count(*) FROM ais_live WHERE ts > now() - make_interval(days => %s) GROUP BY 1, 2", (days,)).fetchall()
-        return {(r[0], r[1]): r[2] for r in rows}
+            rows = c.execute("SELECT cx, cy, sum(fixes) FROM coverage_cells WHERE day >= current_date - %s GROUP BY 1, 2", (days,)).fetchall()
+        return {(r[0], r[1]): int(r[2]) for r in rows}
+
+    def live_prune(self, full_res_days, thin_minutes, retention_months, window_days=3):
+        """Tiered retention. Thinning only looks at the slice that just crossed full_res_days (plus a few
+        days of catch-up) so the daily job stays cheap; window_days=None thins the whole old table once."""
+        with self._conn() as c:
+            deleted = c.execute("DELETE FROM ais_live WHERE ts < now() - make_interval(months => %s)", (retention_months,)).rowcount
+            lower = "" if window_days is None else "AND ts >= now() - make_interval(days => %s)"
+            params: list = [thin_minutes * 60, full_res_days] + ([] if window_days is None else [full_res_days + window_days])
+            thinned = c.execute(f"""DELETE FROM ais_live a USING (
+                    SELECT mmsi, ts, row_number() OVER (PARTITION BY mmsi, floor(extract(epoch FROM ts) / %s) ORDER BY ts) rn
+                    FROM ais_live WHERE ts < now() - make_interval(days => %s) {lower}) t
+                WHERE a.mmsi = t.mmsi AND a.ts = t.ts AND t.rn > 1""", params).rowcount
+            c.execute("DELETE FROM coverage_cells WHERE day < current_date - %s", (int(retention_months * 30.4),))
+            c.commit()
+        return {"deleted": deleted, "thinned": thinned}
 
     def live_stats(self):
         with self._conn() as c:
-            r = c.execute("SELECT count(*), count(DISTINCT mmsi), min(ts), max(ts) FROM ais_live").fetchone()
-            n_imo = c.execute("SELECT count(*) FROM mmsi_map WHERE imo IS NOT NULL").fetchone()[0]
-        return {"positions": r[0], "mmsi": r[1], "with_imo": n_imo, "oldest": int(r[2].timestamp() * 1000) if r[2] else None, "newest": int(r[3].timestamp() * 1000) if r[3] else None}
+            est = c.execute("SELECT reltuples::bigint FROM pg_class WHERE relname = 'ais_live'").fetchone()
+            newest = c.execute("SELECT max(ts) FROM ais_live").fetchone()[0]
+            oldest = c.execute("SELECT min(ts) FROM ais_live").fetchone()[0]
+            n_mmsi, n_imo = c.execute("SELECT count(*), count(imo) FROM mmsi_map").fetchone()
+        n = int(est[0]) if est and est[0] is not None and est[0] >= 0 else 0
+        if n == 0 and newest is not None:   # before the first ANALYZE the estimate is 0 or -1: count exactly, capped at 1M rows
+            n = self._count_small()
+        return {"positions": n, "mmsi": n_mmsi, "with_imo": n_imo, "oldest": int(oldest.timestamp() * 1000) if oldest else None, "newest": int(newest.timestamp() * 1000) if newest else None, "estimate": True}
+
+    def _count_small(self):
+        with self._conn() as c:
+            return c.execute("SELECT count(*) FROM (SELECT 1 FROM ais_live LIMIT 1000000) s").fetchone()[0]
 
     def mmsi_upsert(self, row):
         dim = row.get("dim") or [None, None, None, None]
