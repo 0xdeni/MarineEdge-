@@ -46,7 +46,14 @@ if ! command -v docker >/dev/null 2>&1; then
   fi
   systemctl enable --now docker
 fi
+# buildx is needed by `docker compose build`; add it also where an earlier run installed Docker without it
+if ! docker buildx version >/dev/null 2>&1; then
+  apt-get update -qq || true
+  apt-get install -y -qq docker-buildx-plugin >/dev/null 2>&1 || apt-get install -y -qq docker-buildx >/dev/null 2>&1 \
+    || echo "== warning: docker buildx is missing; image builds may fail"
+fi
 command -v git >/dev/null 2>&1 || { apt-get update -qq; apt-get install -y -qq git >/dev/null; }
+command -v python3 >/dev/null 2>&1 || { apt-get update -qq; apt-get install -y -qq python3 >/dev/null; }
 
 # 2b. Oracle Cloud "Always Free" Ubuntu images ship iptables rules that REJECT everything but SSH.
 #     Open 80/443 there (no-op on Hetzner/DigitalOcean images, which have no such rule).
