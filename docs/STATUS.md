@@ -4,19 +4,22 @@ Links: repo https://github.com/0xdeni/MarineEdge- · PWA prototype https://claud
 
 **Live since 24 Oct 04:03 (São Paulo):** first server on an AWS Free-plan trial — t4g.small (2 Arm cores, 2 GB), Ubuntu 26.04, us-east-1, `https://44-197-249-76.sslip.io`. Installed from the owner's iPhone through EC2 Instance Connect; updates itself from GitHub every 10 minutes, each update gated by the full test suite plus migrations and the PostGIS store test on a scratch database. The trial ends six months after sign-up (late April 2027): an in-app export/import is the next engineering item.
 
-## Where things stand against the brief's milestones
+## Where things stand against the brief's milestones (honest, 24 Oct)
 
-| Milestone | State | Notes |
+| Milestone | Accepted when (brief) | Where we are |
 |---|---|---|
-| M0 Free data path (not in the brief) | **Built, waiting for the free aisstream key** | `recorder` container records aisstream.io live AIS for both regions into `ais_live`/`mmsi_map`; `OwnAISProvider` serves search, tracks, neighbours, static data from it with zero credits; AIS-gap rule is coverage-aware (Info "outside receiver coverage" where no receiver can hear); Global Fishing Watch cross-check button (free, non-commercial licence); Oracle Always Free supported by the installer. `docs/FREE-STACK.md`. |
-| M1 Foundations (steps 0–4) | **Done on mock data; waiting for a key** | Repo, PostGIS schema, adapter interface, mock provider, Datalastic adapter (field names from public docs, unverified), Kpler stub, search endpoint, cache rule with `fetch_log`, CLI with `first-pull` acceptance checks, API token auth. |
-| M2 Voyage map (5–6) | **Done on mock data** | Port calls, voyages, chart with MapLibre/OpenFreeMap tiles under the canvas overlay (verified with a stand-in map object; needs one look on a real network) and schematic fallback offline. |
-| M3 Red flags (7–8) | **Done on synthetic tracks** | All seven rules, 39 tests pass (19 engine, 4 sanctions parsers, 4 service/cache, 2 fleet regression, 9 free-path incl. sampling and disk guard, 1 PostgresStore round-trip that the server's auto-updater now runs against a scratch PostGIS database before every deploy), flag panel with evidence and "show on chart", OFAC/EU/UK/OpenSanctions parsers, STS lookup cap. |
-| M4 Report and go-live (9–10) | **Report done; one-paste installer written, not yet run on a server** | Jinja2 → Playwright PDF; `deploy/cloud-init.yaml` + `install.sh` set up Docker, PostGIS, API, web, Caddy (auto-HTTPS on a domain or `<ip>.sslip.io`), push keys, cron (backup, sanctions, watchlist refresh, auto-update from GitHub). |
+| M1 Foundations | I can search a vessel by name or IMO and pick the right ship; positions are cached | Built and proven on demo data. On the live server, search only covers ships recorded since 24 Oct (free feed) and filters what the app has loaded instead of asking the server. A paid provider is wired but unproven (no key yet). **Not accepted.** |
+| M2 Voyage map | 12 months of a real vessel shows as separate coloured voyages with correct ports and dates | Engine and map built; never run on 12 months of real data, which needs a paid history pull. Port detection uses 68 hand-placed ports until the World Port Index is imported. **Not accepted.** |
+| M3 Red flags | All seven rules fire correctly on test tracks and on one known real case | Synthetic test tracks pass; no real case yet. **Half.** |
+| M4 Report and go-live | PDF report exports; tool runs on the server with backups; tests pass | Server live since 24 Oct with test-gated auto-updates; nightly backup only on the server's own disk (no off-site copy); PDF export not yet verified on the server. **Partly.** |
 
-Phone-only operation: the AIS provider and its key, the connection test, the first-pull acceptance checks and the job triggers are all in the app (Profile › AIS provider, admin token). The server installs itself from a cloud-init paste in the hosting provider's app and auto-updates from GitHub.
+**Assessment.** The infrastructure is ahead of plan; the product is behind it. The core job of the brief — 12 months of a specific ship's voyages and red flags before a fixture — has not been demonstrated on real data, because that history only comes from a paid provider, and the free feed can only build history from 24 Oct onward. Meanwhile effort went into things the brief puts out of scope (fleet map, alerts and push, PWA polish, marketing site, own recording), partly on request. The owner's verdict on the UI — raw, gimmicky, oversized, abstract, unintuitive — is fair: it was built mock-first and decorated for screenshots (glass, animations, fake sign-in options, demo text leaking into the live build, developer jargon on user screens) instead of designed around the two screens the brief asks for.
 
-Beyond the brief: iOS-style PWA shell (glass tab bar and sheet), login, Vessels/Alerts/Reports/Profile pages, Settings that edit rules, zones, provider, appearance, map tiles; watchlist refresh job that turns new flags into alerts and Web Push notifications; server-side watchlist and notes per user; World Port Index importer; dependency-free dev server; marketing landing page on a design canvas.
+**Next, in order:**
+1. Live map on the recorded feed (in the update queue; verify on the owner's phone).
+2. Real history: a Datalastic trial key → first pull of 5–10 real vessels including one known AIS-gap case → validate voyages, ports and flags against reality (M2/M3 acceptance). Needs the owner.
+3. Real-data hardening: World Port Index fetched and imported on the server; server-side search across recorded and provider data; PDF verified on the server; off-site backups.
+4. Redesign from the brief's two screens, with clickable mockups for sign-off before rebuilding: search-first home; one vessel page that reads like the report (plain-language verdict, voyage map, voyage list, findings with evidence); dense, quiet typography; no fake features; technical details behind a disclosure.
 
 ## UI/UX state (reviewed 23 Oct at iPhone 15 size, every screen, light and dark)
 
