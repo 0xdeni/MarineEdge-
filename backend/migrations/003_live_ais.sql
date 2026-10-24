@@ -18,8 +18,16 @@ CREATE TABLE IF NOT EXISTS ais_live (
   PRIMARY KEY (mmsi, ts)
 );
 CREATE INDEX IF NOT EXISTS idx_ais_live_imo_ts ON ais_live (imo, ts);
-CREATE INDEX IF NOT EXISTS idx_ais_live_ts ON ais_live (ts);
-CREATE INDEX IF NOT EXISTS idx_ais_live_geom ON ais_live USING GIST (geom);
+-- These two belong to the original layout only; 004 replaces them (primary key (ts, mmsi), no geom column).
+-- Guarded so that re-applying 003 on an upgraded database (every update re-applies all migrations) is a no-op.
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns
+             WHERE table_schema = current_schema() AND table_name = 'ais_live' AND column_name = 'geom') THEN
+    CREATE INDEX IF NOT EXISTS idx_ais_live_ts ON ais_live (ts);
+    CREATE INDEX IF NOT EXISTS idx_ais_live_geom ON ais_live USING GIST (geom);
+  END IF;
+END $$;
 
 -- Latest static data per MMSI (name, IMO, call sign, destination, ETA, draught, dimensions).
 CREATE TABLE IF NOT EXISTS mmsi_map (
