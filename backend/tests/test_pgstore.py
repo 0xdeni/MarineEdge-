@@ -77,3 +77,40 @@ def test_postgres_store_roundtrip():
     assert st.add_alert(imo, "AIS gap", now, "high", "t", "d") is True
     assert st.add_alert(imo, "AIS gap", now + 1000, "high", "t", "d") is False
     assert any(a["imo"] == imo for a in st.list_alerts(now - 60_000))
+
+
+def test_postgres_store_static():
+    """Runs everywhere, no database: every `self.X` that PostgresStore uses exists, and every SQL statement gets
+    exactly as many parameters as it has %s placeholders. (A refactor once deleted LIVE_NEAR_SQL; only the
+    server's PostGIS test noticed. This catches that class of mistake on any machine.)"""
+    import ast
+    import inspect
+    import textwrap
+    from app.store import PostgresStore
+    tree = ast.parse(textwrap.dedent(inspect.getsource(PostgresStore)))
+    cls = tree.body[0]
+    defined = {n.name for n in cls.body if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))}
+    defined |= {t.id for n in cls.body if isinstance(n, ast.Assign) for t in n.targets if isinstance(t, ast.Name)}
+    defined |= {n.attr for n in ast.walk(cls) if isinstance(n, ast.Attribute) and isinstance(n.ctx, ast.Store)
+                and isinstance(n.value, ast.Name) and n.value.id == "self"}
+    used = {n.attr for n in ast.walk(cls) if isinstance(n, ast.Attribute) and isinstance(n.ctx, ast.Load)
+            and isinstance(n.value, ast.Name) and n.value.id == "self"}
+    assert used <= defined, f"PostgresStore uses undefined attributes: {sorted(used - defined)}"
+
+    consts = {t.id: n.value.value for n in cls.body if isinstance(n, ast.Assign) and isinstance(n.value, ast.Constant)
+              for t in n.targets if isinstance(t, ast.Name)}
+    checked = 0
+    for call in (n for n in ast.walk(cls) if isinstance(n, ast.Call) and getattr(n.func, "attr", "") in ("execute", "executemany") and len(n.args) >= 2):
+        sql_node, params = call.args[0], call.args[1]
+        if isinstance(sql_node, ast.Constant) and isinstance(sql_node.value, str):
+            sql = sql_node.value
+        elif isinstance(sql_node, ast.Attribute) and sql_node.attr in consts:
+            sql = consts[sql_node.attr]
+        else:
+            continue                                   # f-strings with optional clauses are checked by the PostGIS test
+        if isinstance(params, ast.ListComp):
+            params = params.elt
+        if isinstance(params, (ast.Tuple, ast.List)):
+            assert sql.count("%s") == len(params.elts), f"line {call.lineno}: {sql.count('%s')} placeholders, {len(params.elts)} parameters"
+            checked += 1
+    assert checked >= 15

@@ -411,6 +411,14 @@ class PostgresStore:
         return [{**self._live_row(r[:10]), "name": r[10], "callsign": r[11], "type_code": r[12], "destination": r[13],
                  "eta": int(r[14].timestamp() * 1000) if r[14] else None, "static_draught": r[15], "dim": [r[16], r[17], r[18], r[19]]} for r in rows]
 
+    LIVE_NEAR_SQL = """SELECT a.mmsi, COALESCE(a.imo, m.imo), m.name, min(a.ts), max(a.ts), avg(a.lat), avg(a.lon)
+        FROM ais_live a LEFT JOIN mmsi_map m ON m.mmsi = a.mmsi
+        WHERE a.ts BETWEEN %s AND %s
+          AND a.lat BETWEEN %s AND %s AND a.lon BETWEEN %s AND %s
+          AND 2 * 6371008.8 * asin(least(1, sqrt(power(sin(radians(a.lat - %s) / 2), 2)
+                + cos(radians(%s)) * cos(radians(a.lat)) * power(sin(radians(a.lon - %s) / 2), 2)))) <= %s
+        GROUP BY a.mmsi, COALESCE(a.imo, m.imo), m.name"""
+
     def live_near(self, lat, lon, radius_m, t0, t1):
         """Ships within radius_m of a point during [t0, t1]: the primary key (ts, mmsi) narrows the time window,
         a lat/lon box narrows the place, a great-circle distance decides. No PostGIS needed for the live table."""
