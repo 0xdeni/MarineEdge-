@@ -124,21 +124,105 @@ def rule_ais_gap(c: Ctx) -> list[Flag]:
 
 
 # ---------------------------------------------------------------- rule 4: draught change at sea
-def rule_draught(c: Ctx) -> list[Flag]:
+def _slow_stretches(c: Ctx, i0: int, i1: int, max_kn: float, min_h: float) -> list[tuple[int, int]]:
+    """Stretches of fixes i0..i1 (inclusive) slower than max_kn for at least min_h hours, outside port calls."""
     out = []
-    for i in range(1, len(c.track)):
-        a, b = c.track[i - 1], c.track[i]
-        d = b.draught - a.draught
-        if abs(d) < c.rules.draught_change.min_meters or c.in_port[i - 1] or c.in_port[i] or b.jump:
+    i = i0
+    while i <= i1:
+        if c.track[i].sog < max_kn and not c.in_port[i]:
+            j = i
+            while j + 1 <= i1 and c.track[j + 1].sog < max_kn and not c.in_port[j + 1] and c.track[j + 1].t - c.track[j].t < 6 * H:
+                j += 1
+            if c.track[j].t - c.track[i].t >= min_h * H:
+                out.append((i, j))
+            i = j + 1
+        else:
+            i += 1
+    return out
+
+
+def _draught_cause(c: Ctx, i0: int, i1: int) -> tuple[str, dict]:
+    """What happened at sea between fixes i0 and i1 that could have moved cargo: a stop ("stop"), a period with AIS
+    off where receivers can hear ("dark"), or only a period out of receiver range ("unheard"). "underway" when none."""
+    sts, gap = c.rules.sts, c.rules.ais_gap
+    stops = _slow_stretches(c, i0, i1, float(sts.max_speed_kn), float(sts.min_hours))
+    if stops:
+        a, b = max(stops, key=lambda s: c.track[s[1]].t - c.track[s[0]].t)
+        return "stop", {"t0": c.track[a].t, "t1": c.track[b].t, "hours": round((c.track[b].t - c.track[a].t) / H, 1)}
+    best = None
+    for k in range(i0 + 1, i1 + 1):
+        x, y = c.track[k - 1], c.track[k]
+        hours = (y.t - x.t) / H
+        if hours < gap.min_hours:
             continue
-        port, pnm = c.ref.nearest_port(b.lon, b.lat, c.vessel.region)
-        out.append(Flag(rule="Draught change at sea", severity="high", t0=b.t, t1=b.t, lat=b.lat, lon=b.lon,
-                        title=f"Draught {'+' if d > 0 else ''}{d:.1f} m at sea",
-                        lines=[f"{fmt_dt(b.t)} UTC · {fmt_dm(b.lat, b.lon)} · {round(pnm)} nm from {port.name if port else 'nearest port'}",
-                               f"Reported draught {a.draught} m → {b.draught} m with no port call in between",
-                               "Draught is typed in by the crew: indicator, not proof"],
-                        evidence_before=c.track[max(0, i - 3):i], evidence_after=c.track[i:i + 3],
-                        meta={"delta": round(d, 1), "from": a.draught, "to": b.draught}))
+        unheard = False
+        if c.coverage is not None:
+            cov = min(c.coverage(x.lon, x.lat), c.coverage(y.lon, y.lat))
+            unheard = cov < int(gap.get("coverage_min_fixes", 50) or 0) and hours <= gap.get("coverage_max_hours", 72)
+        kind = "unheard" if unheard else "dark"
+        if best is None or (kind == "dark" and best[0] == "unheard") or (kind == best[0] and hours > best[1]["hours"]):
+            best = (kind, {"t0": x.t, "t1": y.t, "hours": round(hours, 1)})
+    return best or ("underway", {})
+
+
+def rule_draught(c: Ctx) -> list[Flag]:
+    """Compares each reported draught with the last one known before it, at sea. A draught of 0 is "not known" in
+    AIS (a recorded feed hears positions before a ship's static message), so it never counts as a value; a port call
+    in between explains any change and starts the comparison afresh.
+
+    Cargo moves only while a ship is stopped, so with `after_stop_or_dark_only` (the default) a change is a red flag
+    when the ship stopped at sea or went dark since its last port call (or since the previous change). A change typed
+    in while it was under way all along is the crew entering the last port's cargo late, and one after a period out
+    of receiver range may follow a port call nobody heard: both are shown as Info and not counted."""
+    out = []
+    r = c.rules.draught_change
+    strict = bool(r.get("after_stop_or_dark_only", True))
+    last: Optional[int] = None      # the last fix at sea with a known draught
+    since = 0                       # where to look for a cause: after the last port call or the last change
+    left: Optional[PortCall] = None
+    calls = iter(c.port_calls)
+    nxt = next(calls, None)
+    for i, b in enumerate(c.track):
+        if c.in_port[i]:
+            while nxt is not None and nxt.i1 < i:
+                nxt = next(calls, None)
+            left = nxt
+            last, since = None, i + 1
+            continue
+        if b.jump or not b.draught or b.draught <= 0:
+            continue
+        if last is not None:
+            a = c.track[last]
+            d = b.draught - a.draught
+            if abs(d) >= r.min_meters:
+                cause, info = _draught_cause(c, since, i) if strict else ("", {})
+                high = cause in ("", "stop", "dark")
+                port, pnm = c.ref.nearest_port(b.lon, b.lat, c.vessel.region)
+                lines = [f"{fmt_dt(b.t)} UTC · {fmt_dm(b.lat, b.lon)} · {round(pnm)} nm from {port.name if port else 'nearest port'}",
+                         f"Reported draught {a.draught} m → {b.draught} m with no port call in between"]
+                meta = {"delta": round(d, 1), "from": a.draught, "to": b.draught, "cause": cause or None}
+                if cause == "stop":
+                    lines.append(f"After a stop at sea: {fmt_dur(info['t1'] - info['t0'])} slower than {c.rules.sts.max_speed_kn} kn, {fmt_dt(info['t0'])} – {fmt_dt(info['t1'])} UTC")
+                elif cause == "dark":
+                    lines.append(f"After {round(info['hours'])} hours with no AIS, {fmt_dt(info['t0'])} – {fmt_dt(info['t1'])} UTC")
+                elif cause == "unheard":
+                    lines.append(f"After {round(info['hours'])} hours outside receiver coverage: a port call there may not have been heard. Not counted.")
+                elif cause == "underway":
+                    if left is not None:
+                        since_h = (b.t - left.depart) / H
+                        meta.update({"port": left.port.name, "since_h": round(since_h, 1)})
+                        lines.append(f"Typed in while under way, {fmt_dur(b.t - left.depart)} after leaving {left.port.name}: most likely that call's cargo, entered late. Not counted.")
+                    else:
+                        lines.append("Typed in while under way, with no stop or port call on record before it. Not counted.")
+                meta.update({k: info[k] for k in ("hours",) if k in info})
+                lines.append("Draught is typed in by the crew: indicator, not proof")
+                sign = "+" if d > 0 else ""
+                title = (f"Draught {sign}{d:.1f} m at sea" if high else
+                         f"Draught {sign}{d:.1f} m after no reception" if cause == "unheard" else f"Draught {sign}{d:.1f} m typed in under way")
+                out.append(Flag(rule="Draught change at sea", severity="high" if high else "info", t0=b.t, t1=b.t, lat=b.lat, lon=b.lon,
+                                title=title, lines=lines, evidence_before=c.track[max(0, i - 3):i], evidence_after=c.track[i:i + 3], meta=meta))
+                since = i
+        last = i
     return out
 
 
@@ -152,6 +236,8 @@ def rule_sts(c: Ctx) -> list[Flag]:
     i = 0
     lookups = 0
     cap = int(r.get("max_lookups_per_vessel", 12) or 0)
+    alongside_m = float(r.get("alongside_max_dist_m", r.max_dist_m) or r.max_dist_m)
+    need_imo = bool(r.get("partner_needs_imo", True))
     while i < n:
         if cap and lookups >= cap:
             break
@@ -162,18 +248,26 @@ def rule_sts(c: Ctx) -> list[Flag]:
             t0, t1 = c.track[i].t, c.track[j].t
             if t1 - t0 >= r.min_hours * H:
                 mid = c.track[(i + j) // 2]
+                stop = c.track[i:j + 1]
+                # At anchor or moored for most of the stop: a transfer needs the other ship alongside. In a busy
+                # anchorage, ships 300–500 m apart are only neighbours swinging on their chains.
+                still = 2 * sum(1 for p in stop if p.nav in (1, 5)) >= len(stop)
+                radius = min(alongside_m, float(r.max_dist_m)) if still else float(r.max_dist_m)
                 lookups += 1
-                for other, n0, n1 in c.vessels_near(mid.lat, mid.lon, r.max_dist_m, t0, t1):
+                for other, n0, n1 in c.vessels_near(mid.lat, mid.lon, radius, t0, t1):
                     if other.imo == c.vessel.imo or n1 - n0 < r.min_hours * H:
                         continue
+                    if need_imo and not other.imo:
+                        continue                      # tugs, pilot boats and harbour craft broadcast no IMO number
                     port, pnm = c.ref.nearest_port(mid.lon, mid.lat, c.vessel.region)
                     out.append(Flag(rule="Possible ship-to-ship transfer", severity="high", t0=t0, t1=t1, lat=mid.lat, lon=mid.lon, partner_imo=other.imo,
                                     title=f"Possible STS with {other.name}",
-                                    lines=[f"{fmt_dt(t0)} – {fmt_dt(t1)} UTC · {fmt_dur(t1 - t0)} both under {r.max_speed_kn} kn, within {r.max_dist_m} m",
+                                    lines=[f"{fmt_dt(t0)} – {fmt_dt(t1)} UTC · {fmt_dur(t1 - t0)} both under {r.max_speed_kn} kn, within {radius:g} m"
+                                           + (" (at anchor or moored: alongside)" if still else ""),
                                            f"{other.name} · IMO {other.imo} · {other.flag} · {other.sub}",
                                            f"{fmt_dm(mid.lat, mid.lon)} · {round(pnm)} nm from {port.name if port else 'nearest port'}, outside port limits"],
                                     evidence_before=c.track[max(0, i - 2):i + 1], evidence_after=c.track[j:j + 3],
-                                    meta={"partner": other.name, "partner_imo": other.imo, "hours": round((t1 - t0) / H, 1)}))
+                                    meta={"partner": other.name, "partner_imo": other.imo, "hours": round((t1 - t0) / H, 1), "alongside": still}))
             i = j + 1
         else:
             i += 1
@@ -181,7 +275,9 @@ def rule_sts(c: Ctx) -> list[Flag]:
 
 
 # ---------------------------------------------------------------- rule 6: position jump
-def rule_jump(c: Ctx) -> list[Flag]:
+def _jumps(c: Ctx) -> list[tuple[int, float, float]]:
+    """(index, implied knots, hours) of each fix impossibly far from the one before. The fix back on track after
+    it belongs to the same event and is not listed."""
     out = []
     i = 1
     while i < len(c.track):
@@ -190,16 +286,24 @@ def rule_jump(c: Ctx) -> list[Flag]:
         if dt > 0:
             kn = nm_dist(a.lat, a.lon, b.lat, b.lon) / dt
             if kn > c.rules.position_jump.max_implied_kn:
-                jam = c.ref.jamming_at(b.lon, b.lat)
-                b.jump = True
-                out.append(Flag(rule="Position jump", severity="medium", t0=b.t, t1=b.t, lat=b.lat, lon=b.lon,
-                                title=f"Position jump, {round(kn)} knots",
-                                lines=[f"{fmt_dt(b.t)} UTC · fix at {fmt_dm(b.lat, b.lon)}, {round(nm_dist(a.lat, a.lon, b.lat, b.lon))} nm from the previous fix {round(dt * 60)} min earlier",
-                                       f"Inside a known GPS jamming area ({jam['name']}) · possible GPS jamming" if jam else "Outside known jamming areas · check the receiver"],
-                                evidence_before=c.track[max(0, i - 2):i], evidence_after=c.track[i:i + 3],
-                                meta={"kn": round(kn), "jamming": jam["name"] if jam else None}))
+                out.append((i, kn, dt))
                 i += 1  # the return fix belongs to the same event
         i += 1
+    return out
+
+
+def rule_jump(c: Ctx) -> list[Flag]:
+    out = []
+    for i, kn, dt in _jumps(c):
+        a, b = c.track[i - 1], c.track[i]
+        jam = c.ref.jamming_at(b.lon, b.lat)
+        b.jump = True
+        out.append(Flag(rule="Position jump", severity="medium", t0=b.t, t1=b.t, lat=b.lat, lon=b.lon,
+                        title=f"Position jump, {round(kn)} knots",
+                        lines=[f"{fmt_dt(b.t)} UTC · fix at {fmt_dm(b.lat, b.lon)}, {round(nm_dist(a.lat, a.lon, b.lat, b.lon))} nm from the previous fix {round(dt * 60)} min earlier",
+                               f"Inside a known GPS jamming area ({jam['name']}) · possible GPS jamming" if jam else "Outside known jamming areas · check the receiver"],
+                        evidence_before=c.track[max(0, i - 2):i], evidence_after=c.track[i:i + 3],
+                        meta={"kn": round(kn), "jamming": jam["name"] if jam else None}))
     return out
 
 
@@ -228,6 +332,8 @@ RULES: list[tuple[str, Callable[[Ctx], list[Flag]]]] = [
 
 
 def run_rules(c: Ctx) -> list[Flag]:
+    for i, _, _ in _jumps(c):
+        c.track[i].jump = True      # marked first: the draught rule runs before the jump rule and leaves these out
     flags: list[Flag] = []
     for _, fn in RULES:
         flags.extend(fn(c))

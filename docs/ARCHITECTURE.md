@@ -59,7 +59,7 @@ config/           rules.yaml · zones.geojson · ports.csv · areas.json
 2. `Service` asks the provider for the ship's particulars and latest static data, then `track()` gets twelve months of positions under the cache rule: on the recorded feed they are read in place (plus any history bought for this ship); on a paid provider only the window not already in `fetch_log` is bought.
 3. `engine.analyze()` cleans the track, finds port calls, runs the seven rules, splits voyages and attaches each finding to its voyage, then derives the live status. It is pure: same input, same output.
 4. `verdict.build()` chooses the level, the sentence, the detail and three figures; `verdict.story()` writes each finding's title and line.
-5. The analysis is saved (`save_analysis`) and the ship's risk row updated (`vessel_risk`), so search results, the region overview and the watchlist show the verdict without re-running it.
+5. The analysis is saved (`save_analysis`) and the ship's risk row updated (`vessel_risk`), so search results, the region overview and the watchlist show the verdict without re-running it. The row carries a stamp of the engine version, thresholds and zones that wrote it (`Service.engine_stamp`); a row under another stamp reads as not checked, and the background sweep checks that ship again.
 6. `analysis_json()` returns the shape the app draws: the map, the verdict card, the timeline, voyages and evidence.
 
 ## Data model (PostgreSQL)

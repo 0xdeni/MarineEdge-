@@ -72,11 +72,23 @@ def zones_off() -> list[str]:
     return list(load().get("zones_off") or [])
 
 
+def zones_on() -> list[str]:
+    """Zones an admin switched on although config/zones.geojson ships them off (Syria since Oct 2026)."""
+    return list(load().get("zones_on") or [])
+
+
 def set_zone_enabled(zone_id: str, enabled: bool) -> list[str]:
     d = load()
     off = set(d.get("zones_off") or [])
-    (off.discard if enabled else off.add)(zone_id)
+    on = set(d.get("zones_on") or [])
+    if enabled:
+        off.discard(zone_id)
+        on.add(zone_id)
+    else:
+        off.add(zone_id)
+        on.discard(zone_id)
     d["zones_off"] = sorted(off)
+    d["zones_on"] = sorted(on)
     save(d)
     return d["zones_off"]
 

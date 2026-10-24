@@ -29,7 +29,7 @@ Everything on screen now comes from the server; the app has no demo data of its 
 | Milestone | Accepted when (brief) | Where we are |
 |---|---|---|
 | M1 Foundations | Search a vessel by name or IMO and pick the right ship; positions cached | Server-side search over the recorded feed, including former names. Covers ships heard since recording started; a Datalastic key adds any ship's past. **Accept on the live server once the aisstream key is in and a day of ships is recorded.** |
-| M2 Voyage map | 12 months of a real vessel as coloured voyages with correct ports and dates | Built; never run on 12 months of real data (needs a paid pull). Ports: 68 hand-placed until the World Port Index import. **Not accepted.** |
+| M2 Voyage map | 12 months of a real vessel as coloured voyages with correct ports and dates | Built; never run on 12 months of real data (needs a paid pull). Ports: 113 hand-placed (Danube, Bug, Azov and the main grain, oil and bulk terminals added 24 Oct) until the World Port Index import. **Not accepted.** |
 | M3 Red flags | Seven rules fire correctly on test tracks and one known real case | Synthetic tracks pass; no real case yet. **Half.** |
 | M4 Report and go-live | PDF exports; runs on the server with backups; tests pass | Server live with test-gated updates; PDF verified here, to verify on the server; backups only on the server's disk. **Partly.** |
 
@@ -37,7 +37,7 @@ Everything on screen now comes from the server; the app has no demo data of its 
 
 1. Done 24 Oct, 09:37: the owner account exists. If it was made by signing in the old way, its password is the admin password: change it in Profile › Password.
 2. Paste the free aisstream.io key on the map screen if it asks for it. Recording starts within a minute; Profile › Data sources shows whether aisstream accepts it.
-3. Decide on the Syria zone: the US ended its Syria sanctions programme in 2025 and the EU and UK lifted most economic sanctions, so a Syrian port call is no longer a breach in itself (details in `docs/METHODOLOGY.md`). Keep it on if your policy still treats Syria as high-risk, or switch it off in Profile › Sensitive zones.
+3. Done 24 Oct: the Syria zone is off by default, as the owner asked (the US ended its Syria sanctions programme in 2025 and the EU and UK lifted most economic sanctions; details in `docs/METHODOLOGY.md`). Switch it back on in Profile › Sensitive zones if a customer's policy needs it.
 4. Global Fishing Watch: ask them for a licence before adding the token (their free terms exclude internal use that supports a business).
 5. Optional now: Datalastic key (12 months per ship), email settings, detailed maps download.
 
@@ -47,6 +47,15 @@ Everything on screen now comes from the server; the app has no demo data of its 
 - **Sanctions rule fixed.** A ship stayed flagged only if the server had first seen its listing in the last 12 months, so a year after the first download every long-standing listing would have stopped counting. Now a listing in force counts however old it is; the finding says "on the list since at least <date>" (the server's first sighting, not the official listing date). New test.
 - **Documentation for people and agents:** `README.md` rewritten; `docs/PRODUCT.md` (capabilities and how MarineEdge compares), `docs/METHODOLOGY.md` (every rule, the verdict, the official guidance behind each red flag), `docs/API.md` (every route), `AGENTS.md` (rules for AI coding agents; `CLAUDE.md` imports it), `llms.txt`; ARCHITECTURE, PROVIDERS, FREE-STACK and DEPLOY brought up to date; stale comments in the code fixed.
 - **Lint pinned** to ruff's classic rules in `backend/pyproject.toml`, so `make lint` means the same with any ruff version (clean).
+- **False alarms cleared from the High-risk list (owner's screenshots, 24 Oct).** 46 Black Sea ships showed High, almost all for "changed draught at sea with no port call", a few for "stopped beside" a harbour craft. Fixes:
+  - A draught of 0 means "not known" in AIS (the draught comes in a separate message, so a recording hears a ship's first positions without it). It never counts as a value now; it read as a change of 9 or 12 m at sea.
+  - A draught change is High only when the ship stopped at sea or went dark since its last port call. Typed in while under way all along, it is the last port's cargo entered late, and is Info ("Draught entered late"); after a quiet period out of receiver range it is Info too. A switch in Red-flag rules restores the old rule.
+  - Ship-to-ship: at anchor or moored, the other ship must be alongside (150 m, not 500 m), and must broadcast an IMO number (tugs, pilot boats and harbour craft don't). Both are settings in Red-flag rules, which now has on/off switches as well as numbers.
+  - 45 more ports, so loading at Izmail, Reni, Mykolaiv, Rostov, Azov, Taganrog, Yeysk, the Romanian Danube ports, Aliağa or Mina Zayed is a port call, not a stop at sea: 113 in all.
+  - Position jumps are left out of the draught check as documented (the jump marks were set after the draught rule ran).
+  - Stored verdicts carry a stamp of the rules and zones that wrote them (migration 007). After this update, and whenever an admin changes a rule or a zone, older verdicts read as not checked and the background check re-checks those ships, newest first; until then the list shows only what has been checked under the rules in force.
+  - Syria ships switched off (owner's decision); an admin's switch in the app wins either way.
+  - 73 backend tests (new: unknown draught, draught causes, ship-to-ship at anchor and without IMO, on/off rule settings, zone defaults, stale verdicts).
 
 ## Unverified (no access from this workspace)
 

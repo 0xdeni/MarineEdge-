@@ -376,7 +376,7 @@ def me_watching(req, who):
     """The watchlist with each ship's name, verdict and last position (what Home shows under Watching)."""
     s = svc()
     imos = s.store.get_watchlist(who.key)
-    risk = s.store.get_risk(imos)
+    risk = s.fresh_risk(imos)
     out = []
     src = s.live_source()
     for imo in imos:
@@ -794,9 +794,14 @@ def admin_rules(req, who):
         if grp not in base or not isinstance(vals, dict) or not isinstance(base[grp], dict):
             raise HTTPError(400, f"Unknown rule group {grp!r}.")
         for k, v in vals.items():
-            if k not in base[grp] or isinstance(base[grp][k], (list, dict)) or isinstance(v, bool) or not isinstance(v, (int, float)):
+            if k not in base[grp] or isinstance(base[grp][k], (list, dict)):
                 raise HTTPError(400, f"{grp}.{k} can't be changed here.")
-            if v < 0 or v > 100_000:
+            if isinstance(base[grp][k], bool):              # an on/off setting
+                if not isinstance(v, bool):
+                    raise HTTPError(400, f"{grp}.{k} must be on or off.")
+            elif isinstance(v, bool) or not isinstance(v, (int, float)):
+                raise HTTPError(400, f"{grp}.{k} can't be changed here.")
+            elif v < 0 or v > 100_000:
                 raise HTTPError(400, f"{grp}.{k} is out of range.")
             clean.setdefault(grp, {})[k] = v
     r = svc().set_rule_overrides(clean)

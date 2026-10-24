@@ -33,7 +33,7 @@ No terminal is needed for any step. Items are in the order that unblocks the mos
 - [ ] **D3. Domain:** buy or pick a subdomain (tracker.yourcompany.com), add an A record to the server's IP, tell me; one setting change moves the server to it.
 - [x] **D4. UK sanctions list:** automatic since 1.0 (the FCDO list has a fixed address now). Profile › Sanctions lists shows the count per list after each daily download.
 - [ ] **D5. Backups off-site:** a bucket (Hetzner Object Storage, Backblaze B2 or S3); send me the access keys through your password manager, not chat. Nightly dumps already run on the server's own disk.
-- [ ] **D6. Zones:** confirm the five sensitive zones (Crimea, occupied Azov coast, Syria, Iran coastal waters, North Korea) or name others; you can switch each one on or off in Profile › Sensitive zones. **Syria first:** the US ended its Syria sanctions programme in 2025 and the EU and UK lifted most economic sanctions, so keep that zone only if your policy still treats Syria as high-risk (`docs/METHODOLOGY.md` has the details).
+- [x] **D6. Zones:** Crimea, the occupied Azov coast, Iran coastal waters and North Korea are on; **Syria is off** (your decision, 24 Oct: the US ended its Syria sanctions programme in 2025 and the EU and UK lifted most economic sanctions). Switch any of them in Profile › Sensitive zones, or name other zones to add.
 - [ ] **D7. OpenSanctions** (optional aggregator): needs a commercial licence for business use; one email for a quote if you want it.
 
 ## Things I keep doing without you

@@ -124,8 +124,8 @@
    "properties": {
     "id": "syria",
     "name": "Syria",
-    "basis": "OFAC/EU sanctions programmes",
-    "enabled": true,
+    "basis": "Most US, EU and UK sanctions lifted in 2025; off unless your policy needs it",
+    "enabled": false,
     "short": "Syria"
    },
    "geometry": {

@@ -94,7 +94,7 @@ A server updated from the earlier token sign-in also accepts, once, `POST /auth/
 | `GET /vessels/{imo}/crosscheck` | — | Global Fishing Watch events for the last 12 months (port visits, loitering, encounters, AIS off). A second opinion, licensed for non-commercial use; `{configured: false}` without a token |
 | `POST /vessels/{imo}/history` | — | **admin.** Buys the missing part of the last 12 months from the paid provider (Datalastic) and re-runs the analysis: `{ok, bought, credits, verdict}` or `{ok, already: true}`. Positions are cached for good and never bought twice |
 
-A **live row** is `{imo, name, mmsi, type, sub, flag, lat, lon, sog, cog, t, nav, level, headline, checked, sanctioned, destination?}`. `level` is the last verdict level, forced to `high` when the IMO is on a sanctions list held by the server.
+A **live row** is `{imo, name, mmsi, type, sub, flag, lat, lon, sog, cog, t, nav, level, headline, checked, sanctioned, destination?}`. `level` is the last verdict level, forced to `high` when the IMO is on a sanctions list held by the server. Only verdicts written under the rules and zones in force count: after an update to the rules, or an admin's change to a threshold or a zone, `level` and `checked` are null until the ship is checked again.
 
 ### The analysis object
 

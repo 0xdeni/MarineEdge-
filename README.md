@@ -12,7 +12,7 @@ MarineEdge is a ship due-diligence app for trading desks that charter ships or a
 
 - **Search** by name, former name, IMO or MMSI. Ships are keyed on the IMO number, so a renamed or reflagged ship is still the same ship.
 - **Twelve months on one map:** voyages port to port, one colour each, the current one dashed to the ship's latest position.
-- **Seven red-flag rules, each with its evidence:** sanctions-list hits (OFAC, EU, UK), calls at sensitive ports (occupied Crimea and Azov coast, Iran, North Korea, Syria), AIS gaps, draught changes at sea, possible ship-to-ship transfers, position jumps (labelled GPS jamming where jamming is known), and name, flag or MMSI changes.
+- **Seven red-flag rules, each with its evidence:** sanctions-list hits (OFAC, EU, UK), calls at sensitive ports (occupied Crimea and Azov coast, Iran, North Korea; Syria available, off by default), AIS gaps, draught changes at sea, possible ship-to-ship transfers, position jumps (labelled GPS jamming where jamming is known), and name, flag or MMSI changes.
 - **A verdict in one sentence,** written by fixed rules, never generated: *"Called at three ports in Crimea, under its former name SILVER DUNE. It also stopped 5 hours beside SILVER REACH at sea and went dark twice, 3 days in all near Crimea."*
 - **The region now:** every ship heard in the last six hours, how many are high risk or on sanctions lists, and the riskiest ones with the reason in plain words.
 - **Watch and hear first:** watched ships are re-checked every 30 minutes; new findings arrive as notifications that open the finding itself.
@@ -39,10 +39,10 @@ The full comparison, with sources: [docs/PRODUCT.md](docs/PRODUCT.md#how-marinee
 | Rule | Fires when (default thresholds, all editable in the app) | Severity |
 |---|---|---|
 | Sanctions hit | The IMO number is on the OFAC SDN list, the EU financial-sanctions list or the UK Sanctions List, as downloaded today (the EU's separate list of ships banned from its ports is next) | High |
-| Call at a sensitive port | A port call or anchorage inside an enabled zone: Crimea, the occupied Azov coast, Iranian waters, North Korean waters, Syria | High |
+| Call at a sensitive port | A port call or anchorage inside an enabled zone: Crimea, the occupied Azov coast, Iranian waters, North Korean waters (Syria ships switched off) | High |
 | AIS gap | No position for more than 6 h at sea; High beyond 24 h or within 100 nm of a zone; Info, not counted, where no receiver can hear | Medium / High |
-| Draught change at sea | Reported draught moves 1.0 m or more with no port call between (an indicator, not proof: the crew types it) | High |
-| Possible ship-to-ship transfer | Under 1 knot outside port for 2 h or more with another ship within 500 m | High |
+| Draught change at sea | Reported draught moves 1.0 m or more with no port call between, after a stop at sea or a dark period (an indicator, not proof: the crew types it). Typed in while under way, it is Info | High / Info |
+| Possible ship-to-ship transfer | Under 1 knot outside port for 2 h or more with another ship (with an IMO number) within 500 m, or alongside within 150 m when at anchor | High |
 | Position jump | Two fixes imply more than 30 knots; "possible GPS jamming" inside known jamming areas | Medium |
 | Identity change | Name, flag or MMSI changed in 12 months | Info, Medium if more than one |
 
@@ -90,7 +90,7 @@ One paste: `deploy/cloud-init.yaml` into an Ubuntu server's user-data field (AWS
 ## Tests and checks
 
 ```bash
-make test       # 65 tests: pytest -q, or python3 -m tests.run without pytest
+make test       # 73 tests: pytest -q, or python3 -m tests.run without pytest
 make lint       # ruff (classic rules, pinned in backend/pyproject.toml)
 ```
 

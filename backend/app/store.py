@@ -1090,22 +1090,23 @@ class PostgresStore:
     # ---- risk summary (vessel_risk) and sanctions membership
     def save_risk(self, imo, row):
         with self._conn() as c:
-            c.execute("""INSERT INTO vessel_risk (imo, name, level, high, medium, info, headline, sentence, sanctioned, history_days, analysed_at)
-                         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, now())
+            c.execute("""INSERT INTO vessel_risk (imo, name, level, high, medium, info, headline, sentence, sanctioned, history_days, engine, analysed_at)
+                         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, now())
                          ON CONFLICT (imo) DO UPDATE SET name=EXCLUDED.name, level=EXCLUDED.level, high=EXCLUDED.high, medium=EXCLUDED.medium, info=EXCLUDED.info,
-                           headline=EXCLUDED.headline, sentence=EXCLUDED.sentence, sanctioned=EXCLUDED.sanctioned, history_days=EXCLUDED.history_days, analysed_at=now()""",
+                           headline=EXCLUDED.headline, sentence=EXCLUDED.sentence, sanctioned=EXCLUDED.sanctioned, history_days=EXCLUDED.history_days,
+                           engine=EXCLUDED.engine, analysed_at=now()""",
                       (imo, row.get("name"), row.get("level") or "clear", int(row.get("high") or 0), int(row.get("medium") or 0), int(row.get("info") or 0),
-                       row.get("headline"), row.get("sentence"), bool(row.get("sanctioned")), row.get("history_days")))
+                       row.get("headline"), row.get("sentence"), bool(row.get("sanctioned")), row.get("history_days"), row.get("engine")))
             c.commit()
 
     def get_risk(self, imos):
         if not imos:
             return {}
         with self._conn() as c:
-            rows = c.execute("SELECT imo, name, level, high, medium, info, headline, sentence, sanctioned, history_days, analysed_at FROM vessel_risk WHERE imo = ANY(%s)",
-                             (list(imos),)).fetchall()
+            rows = c.execute("SELECT imo, name, level, high, medium, info, headline, sentence, sanctioned, history_days, analysed_at, engine FROM vessel_risk "
+                             "WHERE imo = ANY(%s)", (list(imos),)).fetchall()
         return {r[0]: {"imo": r[0], "name": r[1], "level": r[2], "high": r[3], "medium": r[4], "info": r[5], "headline": r[6], "sentence": r[7],
-                       "sanctioned": r[8], "history_days": r[9], "analysed_at": self._ms(r[10])} for r in rows}
+                       "sanctioned": r[8], "history_days": r[9], "analysed_at": self._ms(r[10]), "engine": r[11]} for r in rows}
 
     def sanctioned(self, imos):
         if not imos:

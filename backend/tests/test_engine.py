@@ -6,6 +6,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from app.engine import analyze, load_refdata, load_rules
+from app.engine.rules_config import Rules
 from app.engine.types import D, Vessel
 from tests.synth import Track
 
@@ -120,14 +121,58 @@ def test_no_gap_flag_while_in_port():
 
 
 # ---------------------------------------------------------------- draught
-def test_draught_change_at_sea_is_high():
+def rules_with(**groups):
+    """The default rules with some values changed, as an admin would in the app."""
+    r = Rules({k: (dict(v) if isinstance(v, dict) else v) for k, v in RULES.items()})
+    for g, vals in groups.items():
+        r[g] = {**r[g], **vals}
+    return r
+
+
+def draughts(a):
+    return [f for f in a.flags if f.rule == "Draught change at sea"]
+
+
+def test_draught_change_after_a_stop_at_sea_is_high():
     tr = Track(T0, P["RTA"].lat, P["RTA"].lon, draught=15.0)
-    tr.speed = 12
+    v = vessel(region="B", type="tanker")
+    tr.moor(12).sail_to(26.4, 53.6).drift(4).set_draught(12.4).sail_to_port(P["FJR"]).moor(12)
+    dr = draughts(run(tr, v))
+    assert len(dr) == 1 and dr[0].severity == "high" and "-2.6" in dr[0].title and dr[0].meta["cause"] == "stop"
+    assert any("stop at sea" in ln for ln in dr[0].lines) and any("indicator, not proof" in ln for ln in dr[0].lines)
+
+
+def test_draught_typed_in_under_way_after_a_port_call_is_info():
+    """Cargo can't move while a ship is under way: a change typed in mid-passage is the last port's cargo entered late."""
+    tr = Track(T0, P["RTA"].lat, P["RTA"].lon, draught=15.0)
     v = vessel(region="B", type="tanker")
     tr.moor(12).sail_to(26.4, 53.6).set_draught(12.4).sail_to_port(P["FJR"]).moor(12)
     a = run(tr, v)
-    dr = [f for f in a.flags if f.rule == "Draught change at sea"]
-    assert len(dr) == 1 and dr[0].severity == "high" and "-2.6" in dr[0].title
+    dr = draughts(a)
+    assert len(dr) == 1 and dr[0].severity == "info" and dr[0].meta["cause"] == "underway" and dr[0].meta["port"] == "Ras Tanura"
+    assert a.sev["high"] == 0
+    # with the switch off (Profile › Red-flag rules) every change at sea counts, as in the brief
+    strict_off = analyze(v, tr.pts, REF, rules_with(draught_change={"after_stop_or_dark_only": False}), now=NOW)
+    assert [f.severity for f in draughts(strict_off)] == ["high"]
+
+
+def test_draught_after_going_dark_is_high_unless_out_of_receiver_range():
+    def track():
+        return Track(T0, P["RTA"].lat, P["RTA"].lon, draught=15.0).moor(12).sail_to(26.4, 53.6, gap=(0.3, 10)).set_draught(12.4).sail_to_port(P["FJR"]).moor(12)
+    v = vessel(region="B", type="tanker")
+    dark = draughts(run(track(), v, coverage=lambda lon, lat: 500))
+    assert len(dark) == 1 and dark[0].severity == "high" and dark[0].meta["cause"] == "dark"
+    unheard = draughts(run(track(), v, coverage=lambda lon, lat: 0))
+    assert len(unheard) == 1 and unheard[0].severity == "info" and unheard[0].meta["cause"] == "unheard"
+
+
+def test_unknown_draught_is_not_a_change():
+    """AIS sends draught in a separate message: positions heard before it carry 0, meaning "not known"."""
+    tr = Track(T0, 43.2, 30.5, draught=0.0).sail_to(43.6, 31.4).set_draught(12.0).sail_to(44.0, 32.4)
+    assert draughts(run(tr)) == []
+    tr = Track(T0, 43.2, 30.5, draught=6.0).sail_to(43.4, 30.9).set_draught(0.0).sail_to(43.6, 31.4).drift(4).set_draught(12.0).sail_to(44.0, 32.4)
+    dr = draughts(run(tr))
+    assert len(dr) == 1 and dr[0].meta["from"] == 6.0 and dr[0].meta["to"] == 12.0 and dr[0].severity == "high"
 
 
 def test_draught_change_in_port_is_not_flagged():
@@ -151,6 +196,40 @@ def test_sts_detected_with_partner():
     a = run(tr, v, vessels_near=near)
     sts = [f for f in a.flags if f.rule == "Possible ship-to-ship transfer"]
     assert len(sts) == 1 and sts[0].partner_imo == 9100002 and sts[0].severity == "high"
+
+
+def _anchored_off_fujairah():
+    return Track(T0, P["FJR"].lat, P["FJR"].lon, draught=8.0).moor(12).sail_to(25.0, 56.95).moor(6, nav=1).sail_to_port(P["SOH"]).moor(12)
+
+
+def _partner_at(dist_m, partner):
+    """A provider that sees `partner` dist_m away for the whole stop: returned only when the search reaches it."""
+    def near(lat, lon, radius_m, a0, a1):
+        return [(partner, a0, a1)] if radius_m >= dist_m else []
+    return near
+
+
+def test_sts_at_anchor_needs_the_other_ship_alongside():
+    """In an anchorage, ships 300-500 m apart are neighbours on their own anchors, not a transfer."""
+    partner = vessel(imo=9100002, name="PARTNER ONE", type="tanker", region="B", sub="Aframax crude tanker")
+    v = vessel(region="B", type="tanker")
+    sts = lambda a: [f for f in a.flags if f.rule == "Possible ship-to-ship transfer"]   # noqa: E731
+    assert sts(run(_anchored_off_fujairah(), v, vessels_near=_partner_at(400, partner))) == []
+    hit = sts(run(_anchored_off_fujairah(), v, vessels_near=_partner_at(60, partner)))
+    assert len(hit) == 1 and hit[0].meta["alongside"] is True and "within 150 m" in hit[0].lines[0]
+    # drifting (not anchored), the wider 500 m search applies
+    drifting = Track(T0, P["FJR"].lat, P["FJR"].lon, draught=8.0).moor(12).sail_to(25.0, 56.95).drift(6).sail_to_port(P["SOH"]).moor(12)
+    assert len(sts(run(drifting, v, vessels_near=_partner_at(400, partner)))) == 1
+
+
+def test_sts_ignores_partners_without_an_imo_number():
+    """Tugs, pilot boats and harbour craft broadcast no IMO number."""
+    craft = vessel(imo=0, name="MMSI 273123456", type="other", region="B", sub="Tug")
+    v = vessel(region="B", type="tanker")
+    sts = lambda a: [f for f in a.flags if f.rule == "Possible ship-to-ship transfer"]   # noqa: E731
+    assert sts(run(_anchored_off_fujairah(), v, vessels_near=_partner_at(60, craft))) == []
+    loose = analyze(v, _anchored_off_fujairah().pts, REF, rules_with(sts={"partner_needs_imo": False}), now=NOW, vessels_near=_partner_at(60, craft))
+    assert len(sts(loose)) == 1
 
 
 def test_slow_drift_without_partner_is_not_sts():
@@ -186,6 +265,19 @@ def test_disabled_zone_does_not_fire():
         assert "Call at a sensitive port" not in rules_fired(a)
     finally:
         REF.zone_by_id["crimea"].enabled = True
+
+
+def test_syria_is_off_by_default():
+    """Most US, EU and UK sanctions on Syria were lifted in 2025: the zone ships switched off (an admin can turn it on)."""
+    syria = REF.zone_by_id["syria"]
+    assert syria.default_on is False and syria.enabled is False and REF.zone_by_id["crimea"].default_on is True
+    tr = Track(T0, P["MER"].lat, P["MER"].lon).moor(12).sail_to_port(P["TAR"]).moor(30).sail_to_port(P["MER"]).moor(12)
+    assert "Call at a sensitive port" not in rules_fired(run(tr))
+    syria.enabled = True
+    try:
+        assert "Call at a sensitive port" in rules_fired(run(tr))
+    finally:
+        syria.enabled = False
 
 
 # ---------------------------------------------------------------- identity & sanctions

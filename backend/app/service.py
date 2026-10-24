@@ -9,6 +9,8 @@ Data sources, free first:
     cached forever and merged with the recorded ones."""
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 import threading
 import time
@@ -68,9 +70,9 @@ class Service:
 
     def _apply_zone_settings(self) -> None:
         from app import settings_store
-        off = set(settings_store.zones_off())
+        off, on = set(settings_store.zones_off()), set(settings_store.zones_on())
         for z in self.ref.zones:
-            z.enabled = z.id not in off
+            z.enabled = z.id in on or (z.default_on and z.id not in off)
 
     def _make(self, name: Optional[str], api_key: Optional[str] = None) -> AISProvider:
         from app import settings_store
@@ -193,6 +195,23 @@ class Service:
             self._settings_version = settings_store.version()
         self._cache.clear()
 
+    def engine_stamp(self) -> str:
+        """Which rules wrote a verdict: the engine version, the thresholds in force and the zones switched on. A verdict
+        stored under another stamp counts as not checked, so changing a rule or a zone in the app re-checks every ship."""
+        from app.engine import ENGINE_VERSION
+        zones = sorted(z.id for z in self.ref.zones if z.enabled)
+        digest = hashlib.sha256(json.dumps([self.rules, zones], sort_keys=True, default=str).encode()).hexdigest()[:10]
+        return f"{ENGINE_VERSION}:{digest}"
+
+    def fresh_risk(self, imos: list[int]) -> dict[int, dict]:
+        """Stored verdicts written under the current rules and zones. Others count as not checked (the sweep re-checks them)."""
+        try:
+            rows = self.store.get_risk(imos)
+        except Exception:  # noqa: BLE001
+            return {}
+        stamp = self.engine_stamp()
+        return {i: r for i, r in rows.items() if r.get("engine") == stamp}
+
     # ---- steps 1-2 ----
     def search(self, q: str):
         self._sync()
@@ -201,11 +220,7 @@ class Service:
     def search_json(self, q: str) -> list[dict]:
         """Search results with each ship's last verdict (if it was ever checked) and the former name that matched."""
         matches = self.search(q)
-        risk = {}
-        try:
-            risk = self.store.get_risk([m.imo for m in matches if m.imo])
-        except Exception:  # noqa: BLE001
-            risk = {}
+        risk = self.fresh_risk([m.imo for m in matches if m.imo])
         qu = q.strip().upper()
         out = []
         for m in matches:
@@ -310,7 +325,7 @@ class Service:
         except Exception:  # the analysis is still served if the DB write fails
             log.exception("save_analysis failed for %s", imo)
         try:
-            self.store.save_risk(imo, verdict_mod.risk_row(a, a.verdict))
+            self.store.save_risk(imo, verdict_mod.risk_row(a, a.verdict, engine=self.engine_stamp()))
         except Exception:  # noqa: BLE001
             log.exception("save_risk failed for %s", imo)
         self._cache[imo] = a
@@ -324,10 +339,7 @@ class Service:
         rows = src.get_vessels_in_area(bbox)
         statics = getattr(src, "area_static", {}) or {}
         imos = [v.imo for v, _ in rows if v.imo]
-        try:
-            risk = self.store.get_risk(imos)
-        except Exception:  # noqa: BLE001
-            risk = {}
+        risk = self.fresh_risk(imos)
         try:
             sanc = self.store.sanctioned(imos)
         except Exception:  # noqa: BLE001
