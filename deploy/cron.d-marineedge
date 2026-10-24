@@ -3,3 +3,4 @@
 30 4 * * * root cd /opt/marineedge && docker compose exec -T api python -m app.jobs sanctions >> /var/log/marineedge-sanctions.log 2>&1
 */30 * * * * root cd /opt/marineedge && docker compose exec -T api python -m app.jobs refresh >> /var/log/marineedge-refresh.log 2>&1
 40 3 * * * root cd /opt/marineedge && docker compose exec -T api python -m app.jobs prune-live >> /var/log/marineedge-prune.log 2>&1
+*/20 * * * * root cd /opt/marineedge && docker compose exec -T api python -m app.jobs sweep >> /var/log/marineedge-sweep.log 2>&1

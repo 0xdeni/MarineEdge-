@@ -31,6 +31,8 @@ IMO_RE = re.compile(r"\bIMO(?:\s*(?:number|no\.?|nr\.?))?\s*[:#]?\s*(\d{7})\b", 
 OFAC_SDN = "https://sanctionslistservice.ofac.treas.gov/api/PublicationPreview/exports/SDN.CSV"
 EU_CSV = "https://webgate.ec.europa.eu/fsd/fsf/public/files/csvFullSanctionsList/content?token=dG9rZW4tMjAxNw"
 UK_PAGE = "https://www.gov.uk/government/publications/the-uk-sanctions-list"
+# Since 28 Jan 2026 the FCDO UK Sanctions List is the only UK list (OFSI's consolidated list closed); its CSV has a fixed address.
+UK_CSV = "https://sanctionslist.fcdo.gov.uk/docs/UK-Sanctions-List.csv"
 OPENSANCTIONS_CSV = "https://data.opensanctions.org/datasets/latest/maritime/maritime.csv"
 
 
@@ -83,7 +85,7 @@ def parse_uk_csv(text: str) -> list[dict]:
     start = next((i for i, l in enumerate(lines) if "Name 6" in l or "Name6" in l or "Regime" in l or "Entity Type" in l), 0)
     for row in csv.DictReader(io.StringIO("\n".join(lines[start:]))):
         blob = " ".join(f"{k}: {v}" for k, v in row.items() if v)
-        etype = (row.get("Entity Type") or row.get("Group Type") or "").strip().lower()
+        etype = (row.get("Individual, Entity, Ship") or row.get("Designation Type") or row.get("Entity Type") or row.get("Group Type") or "").strip().lower()
         imo = _imo(blob)
         if imo is None or (etype and etype not in ("ship", "vessel")):
             continue
@@ -147,10 +149,10 @@ def fetch_eu(session: requests.Session | None = None) -> list[dict]:
     return rows
 
 
-def fetch_uk(csv_url: str, session: requests.Session | None = None) -> list[dict]:
-    """The UK CSV link changes with every publication; pass the current one (UK_SANCTIONS_CSV_URL in .env)."""
+def fetch_uk(csv_url: str | None = None, session: requests.Session | None = None) -> list[dict]:
+    """The FCDO UK Sanctions List CSV (UK_SANCTIONS_CSV_URL in .env overrides the address)."""
     s = session or requests.Session()
-    r = s.get(csv_url, timeout=120)
+    r = s.get(csv_url or UK_CSV, timeout=120, headers={"User-Agent": "MarineEdge/1.0 (sanctions refresh)"})
     r.raise_for_status()
     rows = parse_uk_csv(r.content.decode("utf-8-sig", errors="replace"))
     log.info("UK: %d vessels with IMO", len(rows))
@@ -198,9 +200,9 @@ def refresh_all(dsn: str, uk_csv_url: str | None = None, include_opensanctions: 
         except Exception as e:  # one list failing must not block the others
             log.exception("%s refresh failed", name)
             counts[name] = f"failed: {e}"
-    if uk_csv_url:
+    if (uk_csv_url or "").strip().lower() != "off":           # on by default; UK_SANCTIONS_CSV_URL=off skips it
         try:
-            got = fetch_uk(uk_csv_url)
+            got = fetch_uk(uk_csv_url or None)
             rows += got
             counts["UK"] = len(got)
         except Exception as e:

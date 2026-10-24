@@ -2,80 +2,174 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Vessel report · {{ v.name }} · IMO {{ v.imo }}</title>
+<title>MarineEdge · {{ v.name }} · IMO {{ v.imo }}</title>
 <style>
-  @page { size: A4; margin: 14mm 12mm; }
-  body { margin: 0; font: 11pt/1.4 -apple-system, "Helvetica Neue", Arial, sans-serif; color: #14202E; }
-  h1 { font-size: 22pt; margin: 0 0 2pt; letter-spacing: -.01em; }
-  h2 { font-size: 9.5pt; text-transform: uppercase; letter-spacing: .08em; color: #5C6B7C; margin: 18pt 0 6pt; border-bottom: 1px solid #DDE3EA; padding-bottom: 3pt; }
-  .mono { font-family: "SF Mono", Menlo, Consolas, monospace; font-variant-numeric: tabular-nums; }
-  .muted { color: #5C6B7C; }
-  .kv { width: 100%; border-collapse: collapse; font-size: 10pt; }
-  .kv th { text-align: left; font-weight: normal; color: #5C6B7C; width: 32%; padding: 3pt 6pt 3pt 0; vertical-align: top; }
-  .kv td { padding: 3pt 0; vertical-align: top; }
-  .tbl { width: 100%; border-collapse: collapse; font-size: 9pt; }
-  .tbl th { text-align: left; color: #5C6B7C; font-weight: normal; border-bottom: 1px solid #DDE3EA; padding: 3pt 4pt; }
-  .tbl td { padding: 3pt 4pt; border-bottom: 1px solid #EEF1F4; vertical-align: top; }
-  .pill { display: inline-block; font-size: 8pt; letter-spacing: .08em; padding: 1pt 5pt; border-radius: 3pt; font-weight: 600; }
-  .high { background: #FBE7E5; color: #C62828; } .medium { background: #FFF1DA; color: #B86E00; } .info { background: #E4EEF9; color: #2C6CB0; } .ok { background: #E3F3E9; color: #2E7D4F; }
-  .flag { border-left: 3pt solid #C62828; padding: 5pt 8pt; margin: 6pt 0; background: #F8F9FB; page-break-inside: avoid; }
-  .flag.medium { border-left-color: #B86E00; } .flag.info { border-left-color: #2C6CB0; }
-  .flag .t { font-weight: 600; }
-  .flag ul { margin: 3pt 0 0; padding-left: 14pt; color: #3C4A58; font-size: 9.5pt; }
-  .ev { font-family: Menlo, Consolas, monospace; font-size: 8pt; color: #5C6B7C; margin-top: 4pt; }
-  .chart { width: 100%; border: 1px solid #DDE3EA; border-radius: 6pt; overflow: hidden; }
+  @page { size: A4; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 9.6pt/1.42 "Inter", "Helvetica Neue", Helvetica, Arial, "Liberation Sans", sans-serif; color: #15212E; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .top { display: flex; justify-content: space-between; align-items: flex-start; gap: 16pt; }
+  .brand { display: flex; align-items: center; gap: 6pt; font-size: 8.5pt; font-weight: 600; color: #3C4A58; white-space: nowrap; }
+  .brand svg { width: 18pt; height: 18pt; }
+  h1 { font-size: 24pt; line-height: 1.1; margin: 0; letter-spacing: -0.01em; }
+  .sub { color: #5C6B7C; margin-top: 3pt; font-size: 9.5pt; }
+  .gen { color: #7A8794; font-size: 8pt; margin-top: 2pt; }
+  h2 { font-size: 8.3pt; text-transform: uppercase; letter-spacing: 0.09em; color: #5C6B7C; margin: 16pt 0 6pt; padding-bottom: 3pt; border-bottom: 0.75pt solid #DDE3EA; font-weight: 600; page-break-after: avoid; }
+  .verdict { margin-top: 12pt; border-radius: 8pt; padding: 11pt 13pt 12pt; background: #F3F5F8; page-break-inside: avoid; }
+  .verdict.high { background: #FCEBEA; } .verdict.review { background: #FFF3E0; } .verdict.clear { background: #E8F5EC; }
+  .vh { display: flex; justify-content: space-between; align-items: center; }
+  .lvl { font-weight: 700; font-size: 9pt; letter-spacing: 0.02em; }
+  .high .lvl { color: #C21F17; } .review .lvl { color: #A85A00; } .clear .lvl { color: #23733F; } .insufficient .lvl { color: #4E5C6A; }
+  .meta { font-size: 8.5pt; color: #5C6B7C; }
+  .sentence { font: 700 14.5pt/1.3 Georgia, "DejaVu Serif", "Liberation Serif", serif; margin-top: 6pt; }
+  .detail { margin-top: 4pt; color: #3C4A58; }
+  .tiles { display: flex; gap: 8pt; margin-top: 10pt; }
+  .tile { flex: 1; background: rgba(255, 255, 255, 0.72); border-radius: 6pt; padding: 7pt 9pt; }
+  .tile .tv { font-size: 15pt; font-weight: 700; line-height: 1.1; }
+  .tile .tl { font-size: 8pt; color: #5C6B7C; margin-top: 1pt; }
+  .tile.risk .tv { color: #C21F17; }
+  .status { margin-top: 9pt; color: #3C4A58; }
+  .chart { margin-top: 8pt; border-radius: 10pt; overflow: hidden; page-break-inside: avoid; }
   .chart svg { width: 100%; height: auto; display: block; }
-  .foot { font-size: 8pt; color: #5C6B7C; margin-top: 18pt; border-top: 1px solid #DDE3EA; padding-top: 6pt; }
+  .legend { font-size: 8pt; color: #5C6B7C; margin-top: 4pt; }
+  .item { display: grid; grid-template-columns: 18pt 1fr; gap: 0 8pt; padding: 7pt 0; border-bottom: 0.75pt solid #EEF1F4; page-break-inside: avoid; }
+  .no { width: 16pt; height: 16pt; border-radius: 8pt; color: #fff; font-size: 7.5pt; font-weight: 700; display: flex; align-items: center; justify-content: center; margin-top: 1pt; }
+  .no.q { background: #B9C3CC; }
+  .when { font-size: 8pt; color: #5C6B7C; }
+  .what { font-weight: 700; font-size: 10.5pt; margin-top: 1pt; }
+  .why { color: #3C4A58; margin-top: 1pt; }
+  .rec { margin: 4pt 0 0; padding-left: 12pt; color: #4E5C6A; font-size: 8.5pt; }
+  .ev { border-collapse: collapse; margin-top: 5pt; font: 7.4pt/1.35 Menlo, Consolas, "DejaVu Sans Mono", monospace; color: #3C4A58; }
+  .ev td { padding: 1.5pt 10pt 1.5pt 0; white-space: nowrap; }
+  .ev tr.mk td { color: #C21F17; font-weight: 700; }
+  .pill { display: inline-block; font-size: 6.8pt; letter-spacing: 0.06em; padding: 1pt 4.5pt; border-radius: 3pt; font-weight: 700; text-transform: uppercase; vertical-align: 0.5pt; }
+  .p-high { background: #FCEBEA; color: #C21F17; } .p-medium { background: #FFF3E0; color: #A85A00; } .p-info { background: #EEF1F4; color: #5C6B7C; } .p-ok { background: #E8F5EC; color: #23733F; }
+  .kv { width: 100%; border-collapse: collapse; }
+  .kv th { text-align: left; font-weight: 400; color: #5C6B7C; width: 30%; padding: 3.5pt 8pt 3.5pt 0; vertical-align: top; }
+  .kv td { padding: 3.5pt 0; vertical-align: top; }
+  .kv tr + tr th, .kv tr + tr td { border-top: 0.75pt solid #EEF1F4; }
+  .kv .s { font-size: 8pt; color: #5C6B7C; }
+  .small { font-size: 8.5pt; color: #5C6B7C; }
+  .tbl { width: 100%; border-collapse: collapse; font-size: 8.3pt; }
+  .tbl th { text-align: left; color: #5C6B7C; font-weight: 400; border-bottom: 0.75pt solid #DDE3EA; padding: 3pt 6pt 3pt 0; }
+  .tbl td { padding: 3pt 6pt 3pt 0; border-bottom: 0.75pt solid #F1F3F6; vertical-align: top; }
+  .tbl tr { page-break-inside: avoid; }
+  .tbl .num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .tbl .r { text-align: right; }
+  .sw { display: inline-block; width: 7pt; height: 7pt; border-radius: 4pt; margin-right: 5pt; vertical-align: 0.5pt; }
+  .red { color: #C21F17; font-weight: 700; }
+  .note { padding: 6pt 0; border-bottom: 0.75pt solid #EEF1F4; page-break-inside: avoid; }
+  .note .nh { font-size: 8pt; color: #5C6B7C; }
+  .note .nt { margin-top: 2pt; white-space: pre-wrap; }
+  .two { display: flex; gap: 18pt; } .two > div { flex: 1; min-width: 0; }
+  .foot { font-size: 7.8pt; color: #5C6B7C; margin-top: 16pt; border-top: 0.75pt solid #DDE3EA; padding-top: 6pt; line-height: 1.45; page-break-inside: avoid; }
 </style>
 </head>
 <body>
-<h1>{{ v.name }}</h1>
-<div class="mono muted">IMO {{ v.imo }} · MMSI {{ v.mmsi }} · {{ v.callsign }} · report generated {{ generated }}</div>
+<div class="top">
+  <div>
+    <h1>{{ v.name }}</h1>
+    <div class="sub">{{ v.sub or (v.type|capitalize) }}{% if v.flag %} · {{ v.flag }}{% endif %} · IMO {{ v.imo }}{% if v.mmsi %} · MMSI {{ v.mmsi }}{% endif %}{% if v.ex_names %} · formerly {{ v.ex_names|join(', ') }}{% endif %}</div>
+    <div class="gen">Report made {{ generated }}</div>
+  </div>
+  <div class="brand"><svg viewBox="0 0 512 512"><defs><linearGradient id="lgb" x1="0" y1="0" x2="0.4" y2="1"><stop offset="0" stop-color="#12304F"/><stop offset="1" stop-color="#050C17"/></linearGradient></defs><rect width="512" height="512" rx="115" fill="url(#lgb)"/><path d="M112 346 C 138 288, 158 172, 192 172 C 230 172, 228 278, 256 278 C 284 278, 282 172, 320 172 C 354 172, 370 268, 384 318" fill="none" stroke="#fff" stroke-width="38" stroke-linecap="round"/><circle cx="392" cy="342" r="34" fill="#fff"/><circle cx="392" cy="342" r="19" fill="#0A84FF"/></svg>MarineEdge</div>
+</div>
 
-<h2>Identity</h2>
+<div class="verdict {{ vd.level }}">
+  <div class="vh"><span class="lvl">{{ vd.label }}</span><span class="meta">{{ vd.meta }}</span></div>
+  <div class="sentence">{{ vd.sentence }}</div>
+  {% if vd.detail %}<div class="detail">{{ vd.detail }}</div>{% endif %}
+  {% if vd.tiles %}<div class="tiles">{% for t in vd.tiles %}<div class="tile {{ 'risk' if t.risk }}"><div class="tv">{{ t.value }}</div><div class="tl">{{ t.label }}</div></div>{% endfor %}</div>{% endif %}
+</div>
+<div class="status">
+  {% if a.track %}{{ a.status.state|capitalize }}{% if a.status.port %} {{ 'at' if a.status.state == 'moored' else 'off' }} {{ a.status.port.name }}{% endif %}{% if a.status.since %} since {{ a.status.since|dy }}{% endif %}{% if a.status.destination %} · next port typed by the crew: {{ a.status.next_port.name if a.status.next_port else (a.status.destination|title) }}{% endif %}{% if a.status.eta and a.status.state == 'underway' %} · ETA {{ a.status.eta|dt }} UTC{% endif %} · last position {{ a.track[-1].t|dt }} UTC{% else %}No positions yet.{% endif %}
+</div>
+
+{% if chart %}
+<h2>The last twelve months on the chart</h2>
+<div class="chart">{{ chart|safe }}</div>
+<div class="legend">One colour per voyage, the current one dashed. Numbered dots are the findings below; red hatching marks sensitive zones; the blue dot is the last position.</div>
+{% endif %}
+
+<h2>What happened{% if findings %} · {{ findings|length }} {{ 'finding' if findings|length == 1 else 'findings' }}{% endif %}</h2>
+{% for f in findings %}
+<div class="item">
+  <div class="no" style="background: {{ f.color }}">{{ f.no }}</div>
+  <div>
+    <div class="when">{{ f.when }} &nbsp;<span class="pill p-{{ f.severity }}">{{ f.severity }}</span>&nbsp; {{ f.rule }}{% if f.voyage %} · voyage {{ f.voyage }}{% endif %}</div>
+    <div class="what">{{ f.title }}</div>
+    <div class="why">{{ f.text }}</div>
+    {% if f.lines %}<ul class="rec">{% for l in f.lines %}<li>{{ l }}</li>{% endfor %}</ul>{% endif %}
+    {% if f.evidence %}<table class="ev">{% for p in f.evidence %}<tr class="{{ 'mk' if p.mark }}"><td>{{ p.t }} UTC</td><td>{{ p.pos }}</td><td>{{ p.sog }}</td><td>{{ p.draught }}</td></tr>{% endfor %}</table>{% endif %}
+  </div>
+</div>
+{% else %}
+<p class="small">{% if vd.level == 'insufficient' %}Not enough positions yet to judge how this ship behaves.{% else %}No red flags in {{ vd.meta }}.{% endif %}</p>
+{% endfor %}
+{% if quiet %}
+<p class="small" style="margin-top:8pt">Not counted: {{ quiet|length }} quiet {{ 'period' if quiet|length == 1 else 'periods' }} where no receiver could hear the ship ({% for q in quiet %}{{ q.when }}{% if not loop.last %}; {% endif %}{% endfor %}). Coastal receivers don't cover the open sea, so these are not treated as going dark.</p>
+{% endif %}
+
+<h2>Identity and sanctions</h2>
 <table class="kv">
-  <tr><th>Name</th><td>{{ v.name }}{% if v.ex_names %} <span class="muted">(ex {{ v.ex_names|join(', ') }})</span>{% endif %}</td></tr>
-  <tr><th>Flag</th><td>{{ v.flag }}</td></tr>
-  <tr><th>Type</th><td>{{ v.sub }} · {{ v.dwt|n }} dwt · {{ v.loa }} m × {{ v.beam }} m</td></tr>
-  <tr><th>Built</th><td>{{ v.built }} · {{ v.builder }}</td></tr>
-  <tr><th>Owner / manager</th><td>{{ v.reg_owner }} · {{ v.ism }}</td></tr>
-  <tr><th>Beneficial owner</th><td>{{ v.ben_owner }}</td></tr>
-  <tr><th>Class / P&amp;I</th><td>{{ v.class_soc }} · {{ v.pi }}</td></tr>
-  <tr><th>Status</th><td>{{ a.status.state|capitalize }}{% if a.status.port %} at {{ a.status.port.name }}{% endif %}{% if a.status.destination %} · destination {{ a.status.destination }}{% endif %}{% if a.status.eta %} · ETA {{ a.status.eta|dt }} UTC{% endif %}</td></tr>
-  <tr><th>Sanctions</th><td>{% for l in ['OFAC SDN', 'EU', 'UK'] %}{% set hit = (v.sanctions|selectattr('list', 'equalto', l)|list) %}{{ l }}: {% if hit %}<span class="pill high">LISTED</span> {{ hit[0].t|dy }} · {{ hit[0].programme }}{% else %}<span class="pill ok">CLEAR</span>{% endif %}{% if not loop.last %} &nbsp;·&nbsp; {% endif %}{% endfor %}</td></tr>
-  {% if v.history %}<tr><th>Identity changes</th><td>{% for h in v.history|sort(attribute='t', reverse=true) %}{{ h.t|dy }}: {{ h.field }} {{ h['from'] }} → {{ h.to }}<br>{% endfor %}</td></tr>{% endif %}
+  <tr><th>Sanctions</th><td>{% if sanc.listed %}<span class="red">Listed</span> · {% for s in sanc.listed %}{{ s.list }}{% if s.programme %} ({{ s.programme }}){% endif %}{% if s.t %} since {{ s.t }}{% endif %}{% if not loop.last %}; {% endif %}{% endfor %}{% elif sanc.lists %}Not listed <span class="s">· checked against {{ sanc.lists }}{% if sanc.checked %}, lists downloaded {{ sanc.checked }}{% endif %}</span>{% else %}<span class="s">Not checked: the server hasn't downloaded the sanctions lists yet</span>{% endif %}</td></tr>
+  <tr><th>Name</th><td>{{ v.name }}{% if last.name %} <span class="s">· since {{ last.name.t|dy }}, before: {{ last.name['from'] }}</span>{% elif v.ex_names %} <span class="s">· formerly {{ v.ex_names|join(', ') }}</span>{% endif %}</td></tr>
+  {% if v.flag %}<tr><th>Flag</th><td>{{ v.flag }}{% if last.flag %} <span class="s">· since {{ last.flag.t|dy }}, before: {{ last.flag['from'] }}</span>{% endif %}</td></tr>{% endif %}
+  {% if v.mmsi %}<tr><th>MMSI</th><td>{{ v.mmsi }}{% if last.mmsi %} <span class="s">· since {{ last.mmsi.t|dy }}, before: {{ last.mmsi['from'] }}</span>{% endif %}</td></tr>{% endif %}
+  {% if v.callsign %}<tr><th>Call sign</th><td>{{ v.callsign }}</td></tr>{% endif %}
 </table>
 
-<h2>Chart · last 12 months, one colour per voyage</h2>
-<div class="chart">{{ chart|safe }}</div>
+<div class="two">
+<div>
+<h2>Ship</h2>
+<table class="kv">
+  <tr><th>Type</th><td>{{ v.sub or (v.type|capitalize) }}</td></tr>
+  {% if v.dwt %}<tr><th>Deadweight</th><td>{{ v.dwt|n }} t</td></tr>{% endif %}
+  {% if v.loa %}<tr><th>Length × beam</th><td>{{ v.loa|round|int }}{% if v.beam %} × {{ v.beam|round|int }}{% endif %} m</td></tr>{% endif %}
+  {% if v.built %}<tr><th>Built</th><td>{{ v.built }}{% if v.builder %}, {{ v.builder }}{% endif %}</td></tr>{% endif %}
+  {% if v.gt %}<tr><th>Gross tonnage</th><td>{{ v.gt|n }}</td></tr>{% endif %}
+</table>
+</div>
+<div>
+<h2>Owner, manager, class, insurer</h2>
+<table class="kv">
+  {% if v.reg_owner or v.ben_owner or v.ism or v.operator or v.class_soc or v.pi %}
+  {% if v.reg_owner %}<tr><th>Owner</th><td>{{ v.reg_owner }}</td></tr>{% endif %}
+  {% if v.ben_owner %}<tr><th>Beneficial owner</th><td>{{ v.ben_owner }}</td></tr>{% endif %}
+  {% if v.ism %}<tr><th>ISM manager</th><td>{{ v.ism }}</td></tr>{% endif %}
+  {% if v.operator %}<tr><th>Operator</th><td>{{ v.operator }}</td></tr>{% endif %}
+  {% if v.class_soc %}<tr><th>Class</th><td>{{ v.class_soc }}</td></tr>{% endif %}
+  {% if v.pi %}<tr><th>P&amp;I</th><td>{{ v.pi }}</td></tr>{% endif %}
+  {% else %}<tr><th>—</th><td class="s">Not in AIS data. Look up IMO {{ v.imo }} in Equasis (equasis.org).</td></tr>{% endif %}
+</table>
+</div>
+</div>
 
-<h2>Voyages ({{ a.voyages|length }})</h2>
+{% if voyages %}
+<h2>Voyages · {{ voyages|length }}</h2>
 <table class="tbl">
-  <thead><tr><th>#</th><th>From → to</th><th>Departed</th><th>Arrived</th><th>nm</th><th>Draught out / in</th><th>Dark</th><th>Flags</th></tr></thead>
+  <thead><tr><th>From → to</th><th>Departed (UTC)</th><th>Arrived (UTC)</th><th class="r">nm</th><th>Draught (m)</th><th class="r">AIS off</th><th class="r">Findings</th></tr></thead>
   <tbody>
-  {% for vg in a.voyages|reverse %}
-    <tr><td class="mono">V{{ vg.n }}</td><td>{{ vg.frm.port.name if vg.frm else 'History start' }} → {{ vg.to.port.name if vg.to else (a.status.destination or '…') }}</td>
-      <td class="mono">{{ vg.depart|dt }}</td><td class="mono">{{ vg.arrive|dt if vg.arrive else 'underway' }}</td><td class="mono">{{ vg.nm|n }}</td>
-      <td class="mono">{{ vg.draught_out }} / {{ vg.draught_in }}</td><td class="mono">{{ (vg.dark_h|round|int ~ ' h') if vg.dark_h else '—' }}</td>
-      <td class="mono">{% if vg.flags %}<b style="color:#C62828">{{ vg.flags|length }}</b>{% else %}—{% endif %}</td></tr>
+  {% for vg in voyages %}
+    <tr><td><span class="sw" style="background: {{ vg.color }}"></span>{{ vg.name }}{% if vg.current %} <span class="s">(now)</span>{% endif %}</td>
+      <td class="num">{{ vg.depart }}</td><td class="num">{{ vg.arrive }}</td><td class="num r">{{ vg.nm }}</td><td class="num">{{ vg.draught }}</td>
+      <td class="num r">{{ vg.dark }}</td><td class="num r">{% if vg.flags %}<span class="red">{{ vg.flags }}</span>{% else %}—{% endif %}</td></tr>
   {% endfor %}
   </tbody>
 </table>
+{% endif %}
 
-<h2>Red flags ({{ a.flags|length }}: {{ a.sev.high }} high, {{ a.sev.medium }} medium, {{ a.sev.info }} info)</h2>
-{% for f in a.flags %}
-<div class="flag {{ f.severity }}"><span class="pill {{ f.severity }}">{{ f.severity|upper }}</span> <span class="t">{{ f.title }}</span>{% if f.voyage %} <span class="muted">V{{ f.voyage.n }}</span>{% endif %}
-  <ul>{% for l in f.lines %}<li>{{ l }}</li>{% endfor %}</ul>
-  {% if f.evidence_before or f.evidence_after %}<div class="ev">{% for p in f.evidence_before %}{{ p.t|dt }} {{ p|dm }} · {{ p.sog }} kn · {{ p.draught }} m<br>{% endfor %}— {{ f.rule|lower }} —<br>{% for p in f.evidence_after %}{{ p.t|dt }} {{ p|dm }} · {{ p.sog }} kn · {{ p.draught }} m<br>{% endfor %}</div>{% endif %}
-</div>
-{% else %}
-<p class="muted">No red flags in the last 12 months.</p>
+{% if notes %}
+<h2>Team notes · {{ notes|length }}</h2>
+{% for n in notes %}
+<div class="note"><div class="nh"><b style="color:#15212E">{{ n.author }}</b> · {{ n.when }}{% if n.ctx %} · {{ n.ctx }}{% endif %}</div><div class="nt">{{ n.text }}</div></div>
 {% endfor %}
+{% endif %}
 
-{% if notes %}<h2>Analyst notes</h2>{% for n in notes %}<p><b>V{{ n.voyage_n }}</b> · {{ n.text }}</p>{% endfor %}{% endif %}
-
-<div class="foot">Pipeline: {{ a.stats.raw|n }} raw positions → {{ a.stats.clean|n }} clean ({{ a.stats.dup }} duplicates, {{ a.stats.bad }} bad fixes dropped) → {{ a.stats.port_calls }} port calls → {{ a.stats.voyages }} voyages → {{ a.stats.flags }} flags.
-{% if a.stats.source %}Positions: {{ a.stats.source }}.{% endif %}{% if a.stats.history_since %} Recorded history starts {{ a.stats.history_since|dy }}; nothing before that date is known from this feed, and coastal receivers do not cover open sea — gaps there are marked "outside receiver coverage".{% endif %}
-Draught-based flags rely on crew-entered values and AIS can be spoofed: flags are reasons to look, not verdicts. Thresholds from config/rules.yaml.</div>
+<div class="foot">
+  From {{ positions }} positions{% if history_from %}, {{ history_from }} to the report date{% endif %}.
+  {% if recorded %}Positions were recorded by your MarineEdge server from aisstream.io's free feed{% if history_since %} since {{ history_since }}{% endif %}; coastal receivers don't cover the open sea, so quiet periods there are not counted as going dark.{% elif source %}Positions: {{ source }}.{% endif %}
+  Draught is typed in by the crew, so draught-based flags are indicators, not proof. AIS can be switched off or spoofed: findings are rule-based reasons to look closer, not legal conclusions.
+  Rules on this server: a port call is {{ R.pc_h }} h or more below {{ R.pc_kn }} kn at a berth or anchorage; an AIS gap is over {{ R.gap_h }} h at sea (High over {{ R.gap_high }} h or within {{ R.gap_nm }} nm of a sensitive zone); a draught change is {{ R.dr_m }} m or more with no port call between; a ship-to-ship stop is {{ R.sts_h }} h or more within {{ R.sts_m }} m, both below {{ R.sts_kn }} kn, outside port limits; a position jump implies over {{ R.jump_kn }} kn.
+</div>
 </body>
 </html>

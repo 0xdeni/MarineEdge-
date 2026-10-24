@@ -44,6 +44,20 @@ def test_eu_vessel_rows_deduplicated_and_non_vessels_skipped():
     assert [(r["imo"], r["name"], r["programme"]) for r in rows] == [(9000019, "SILVER REACH", "UKR")]
 
 
+UKSL = (   # the FCDO UK Sanctions List layout (since 2026): a type column and an IMO number column, one row per name
+    "Last Updated,Unique ID,Name 6,Name type,Regime Name,\"Individual, Entity, Ship\",IMO number,Current believed flag of ship\n"
+    "2026-10-20,RUS1234,SEA BREEZE,Primary Name,The Russia (Sanctions) (EU Exit) Regulations 2019,Ship,9000071,Cameroon\n"
+    "2026-10-20,RUS1234,OCEAN BREEZE,Alias,The Russia (Sanctions) (EU Exit) Regulations 2019,Ship,9000071,Cameroon\n"
+    "2026-10-20,RUS0099,IVAN PETROV,Primary Name,The Russia (Sanctions) (EU Exit) Regulations 2019,Individual,,\n"
+)
+
+
+def test_uk_sanctions_list_layout():
+    rows = parse_uk_csv(UKSL)
+    assert [(r["imo"], r["name"]) for r in rows] == [(9000071, "SEA BREEZE")]
+    assert rows[0]["programme"].startswith("The Russia")
+
+
 def test_uk_ships_parsed_from_free_text():
     rows = parse_uk_csv(UK)
     assert sorted(r["imo"] for r in rows) == [9000027, 9000046]

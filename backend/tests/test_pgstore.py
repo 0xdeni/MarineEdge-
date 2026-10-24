@@ -114,3 +114,72 @@ def test_postgres_store_static():
             assert sql.count("%s") == len(params.elts), f"line {call.lineno}: {sql.count('%s')} placeholders, {len(params.elts)} parameters"
             checked += 1
     assert checked >= 15
+
+
+def test_postgres_accounts_roundtrip():
+    """Accounts, sessions, invites, resets, team notes, risk rows and former names against the real schema
+    (migration 005). Unique emails, cleaned up afterwards, so it can run on any scratch database."""
+    if not DSN:
+        try:
+            import pytest  # type: ignore
+            pytest.skip("DATABASE_URL not set")
+        except ImportError:
+            return
+    from app import accounts as acc
+    from app.store import PostgresStore
+    st = PostgresStore(DSN)
+    tag = str(int(time.time() * 1000))[-8:]
+    owner_email, ana_email = f"owner{tag}@example.com", f"ana{tag}@example.com"
+
+    class Mail:
+        sent: list = []
+
+        def configured(self):
+            return True
+
+        def send(self, to, subject, text, html=None):
+            self.sent.append((to, text))
+
+    acc.LIMITS.reset()
+    a = acc.Accounts(st, Mail())
+    uid = st.create_user(owner_email, "Owner", "admin", acc.hash_password("owner-pass-phrase-1"))
+    try:
+        s = a.login(owner_email, "owner-pass-phrase-1", ua="iPhone Safari", ip="10.0.0.1")
+        assert a.session_user(s.token)[0]["email"] == owner_email
+        inv = a.create_invite(s.user, email=ana_email, role="analyst", base_url="https://x")
+        assert a.invite_info(inv["code"])["valid"] and inv["emailed"]
+        ana = a.signup("Ana Silva", ana_email, "another-long-pass", invite=inv["code"], ua="Mac Chrome")
+        assert ana.user["role"] == "analyst" and not a.invite_info(inv["code"])["valid"]
+        a.forgot(ana_email, "https://x")
+        code = [w for w in Mail.sent[-1][1].replace(".", " ").split() if w.isdigit() and len(w) == 6][0]
+        s2 = a.reset("brand-new-pass-77", email=ana_email, code=code)
+        assert a.session_user(ana.token) is None and a.session_user(s2.token)[0]["email"] == ana_email
+        link = a.admin_reset_link(s.user, s2.user["id"], "https://x")
+        assert a.reset_info(link["link"].split("/reset/")[1])["valid"]
+        u = a.update_profile(s.user, name="Owner Two", prefs={"theme": "dark", "pushMin": "medium"})
+        assert u["name"] == "Owner Two" and u["prefs"]["pushMin"] == "medium"
+        assert a.set_member(u, s2.user["id"], role="admin")["role"] == "admin"
+        nid = st.add_vessel_note(9900002, "voyage:3", owner_email, "first")
+        st.update_vessel_note(nid, "edited")
+        n = st.get_vessel_note(nid)
+        assert n["text"] == "edited" and n["scope"] == "voyage:3" and n["author"] == "Owner Two"
+        st.delete_vessel_note(nid)
+        assert st.get_vessel_note(nid) is None
+        st.save_risk(9900002, {"name": "TEST", "level": "high", "high": 2, "medium": 0, "info": 1, "headline": "h", "sentence": "s", "sanctioned": False, "history_days": 300.0})
+        assert st.get_risk([9900002])[9900002]["level"] == "high"
+        st.set_alerts_seen(owner_email, int(time.time() * 1000))
+        assert st.get_alerts_seen(owner_email) > 0
+        a.remove_member(u, s2.user["id"])
+        assert ana_email not in [x["email"] for x in a.team()["users"]]
+        status = st.sanctions_status()
+        assert "lists" in status and isinstance(status["lists"], dict)
+    finally:
+        with st._conn() as c:
+            c.execute("DELETE FROM vessel_risk WHERE imo=%s", (9900002,))
+            c.commit()
+        for e in (owner_email, ana_email):
+            row = st.get_user_by_email(e)
+            if row:
+                st.delete_user_sessions(row["id"])
+                st.delete_user(row["id"])
+        del uid

@@ -24,3 +24,7 @@ testpaths = ["tests"]
 [tool.ruff]
 line-length = 160
 target-version = "py311"
+
+[tool.ruff.lint]
+# the codebase's compact style: small lambdas, short loop names, several argparse calls per line
+ignore = ["E731", "E741", "E702"]

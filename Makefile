@@ -1,10 +1,9 @@
 .PHONY: dev test api web demo lint
-dev: ## run API (mock provider, in-memory cache) and static web on :8000 / :8080
-	cd backend && VVT_PROVIDER=mock uvicorn app.main:app --reload --port 8000 &
-	cd frontend/public && python3 -m http.server 8080
+dev: ## app + API on :8080 with the generated demo fleet (in-memory, stdlib only). First account: server admin password dev-setup-code
+	cd backend && API_TOKENS=admin:dev-setup-code:admin python3 -m app.devserver
 test:
 	cd backend && (pytest -q || python3 -m tests.run)
 lint:
 	cd backend && ruff check app tests
-demo: ## generate a sample PDF report with the mock provider
-	cd backend && python3 -c "from app.service import Service; from app.reports.render import render_html, render_pdf; s=Service(); a=s.analysis(9000036); print(render_pdf(render_html(a), 9000036))"
+demo: ## a sample PDF report from the demo fleet (needs Playwright's Chromium)
+	cd backend && VVT_PROVIDER=mock VVT_ALLOW_MOCK=1 python3 -m app.cli report 9000013

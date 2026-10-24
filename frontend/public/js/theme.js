@@ -1,0 +1,2 @@
+/* Apply the saved appearance before first paint (night stays night). Kept tiny and blocking on purpose. */
+(function () { try { var t = localStorage.getItem('me.theme') || 'system'; var d = t === 'system' ? (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark') : t; document.documentElement.dataset.theme = d; var m = document.querySelector('meta[name=theme-color]'); if (m) m.content = d === 'light' ? '#F2F2F7' : '#000000'; } catch (e) {} })();

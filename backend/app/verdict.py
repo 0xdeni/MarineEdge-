@@ -174,8 +174,19 @@ def _categories(a: Analysis) -> list[_Cat]:
     return out
 
 
-def build(a: Analysis, sanctions_checked: bool = True) -> dict[str, Any]:
-    """`sanctions_checked`: the server holds downloaded sanctions lists. Without them the page must not say "not listed"."""
+def lists_text(lists: Optional[list[str]], conj: str = "or") -> str:
+    """'OFAC, EU or UK' for the lists actually loaded, in the usual order."""
+    names = [LIST_SHORT.get(x, x) for x in LIST_ORDER if x in (lists or [])] + [x for x in (lists or []) if x not in LIST_ORDER]
+    if len(names) <= 1:
+        return "".join(names)
+    return ", ".join(names[:-1]) + f" {conj} " + names[-1]
+
+
+def build(a: Analysis, sanctions_checked: bool = True, lists: Optional[list[str]] = None) -> dict[str, Any]:
+    """`sanctions_checked`: the server holds downloaded sanctions lists. Without them the page must not say "not listed".
+    `lists`: which ones, so the sentence names only lists that were really checked."""
+    if lists is None:
+        lists = list(LIST_ORDER) if sanctions_checked else []
     days = history_days(a)
     sev = a.sev
     cats = _categories(a)
@@ -202,7 +213,7 @@ def build(a: Analysis, sanctions_checked: bool = True) -> dict[str, Any]:
     elif level == "insufficient":
         d = round(days)
         sentence = "No positions yet." if not a.track else (f"Only {d} {plural(d, 'day')} of positions so far." if d >= 1 else "Only a few hours of positions so far.")
-        detail = ("Not on the OFAC, EU or UK sanctions lists. Behaviour checks need a few weeks of voyages." if sanctions_checked else
+        detail = (f"Not on the {lists_text(lists)} sanctions {plural(len(lists), 'list')}. Behaviour checks need a few weeks of voyages." if sanctions_checked and lists else
                   "Behaviour checks need a few weeks of voyages. Sanctions lists haven't been downloaded to this server yet.")
     else:
         sentence = f"Nothing found in {round(days / 30.4)} months of positions." if days >= 60 else f"Nothing found in {round(days)} days of positions."

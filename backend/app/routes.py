@@ -310,7 +310,8 @@ def _me_json(who: auth.Principal) -> dict:
     watch = s.store.get_watchlist(who.key)
     return {"user": user, "watchlist": watch, "push": {"configured": push.configured(), "publicKey": push.public_key()},
             "unread": _unread(who), "server": {"version": VERSION, "source": "demo" if s.is_mock else getattr(s.provider, "name", "?"),
-                                               "liveKey": bool(settings_store.provider_key("aisstream")), "mock": s.is_mock}}
+                                               "liveKey": bool(settings_store.provider_key("aisstream")), "mock": s.is_mock,
+                                               "recorder": (_recorder_status().get("state") if who.is_admin else None)}}
 
 
 @route("GET", "/api/me")
@@ -445,6 +446,7 @@ def analysis(req, who, imo):
         out["sanctionsChecked"] = (s.store.sanctions_status() or {}).get("refreshed") if not s.is_mock else s._now()
     except Exception:  # noqa: BLE001
         out["sanctionsChecked"] = None
+    out["sanctionsLists"] = s.sanctions_lists()
     return out
 
 
@@ -457,9 +459,14 @@ def buy_history(req, who, imo):
 
 def _report(imo: int, fmt: str):
     from app.reports.render import render_html, render_pdf
+    s = svc()
     a = _analysis(imo)
-    notes = svc().store.list_vessel_notes(imo)
-    html = render_html(a, notes=notes)
+    notes = s.store.list_vessel_notes(imo)
+    try:
+        checked = (s.store.sanctions_status() or {}).get("refreshed") if not s.is_mock else s._now()
+    except Exception:  # noqa: BLE001
+        checked = None
+    html = render_html(a, notes=notes, ref=s.ref, lists=s.sanctions_lists(), checked_at=checked, rules=dict(s.rules))
     if fmt == "html":
         return Response(html, content_type="text/html; charset=utf-8")
     path = render_pdf(html, imo)
@@ -654,7 +661,16 @@ def admin_config(req, who):
             "fetches_this_run": s.fetches, "zones": [{"id": z.id, "name": z.name, "basis": z.basis, "enabled": z.enabled} for z in s.ref.zones],
             "database": bool(os.environ.get("DATABASE_URL")), "push": push.configured(), "email": mailer.public_view(), "maps": maps.status(),
             "sanctions": sanc, "history": {"available": hp is not None, "provider": getattr(hp, "name", None) if hp else None},
-            "users": app_state().accounts.store.count_users(), "version": VERSION, "mock": s.is_mock, "sweep": dict(s._sweep_state)}
+            "users": app_state().accounts.store.count_users(), "version": VERSION, "mock": s.is_mock, "sweep": dict(s._sweep_state),
+            "recorder": _recorder_status()}
+
+
+def _recorder_status() -> dict:
+    try:
+        from app.recorder import read_status
+        return read_status()
+    except Exception:  # noqa: BLE001
+        return {}
 
 
 @route("POST", "/api/admin/provider", "admin")

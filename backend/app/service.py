@@ -265,13 +265,22 @@ class Service:
         self._cache.pop(imo, None)
         return {"ok": True, "bought": len(pts), "credits": getattr(hp, "last_credits", None)}
 
-    def sanctions_checked(self) -> bool:
+    def sanctions_lists(self) -> list[str]:
+        """Names of the sanctions lists the server holds (downloaded and not empty). The page only says
+        "not listed" for these."""
         if self.is_mock:
-            return True
+            return ["OFAC SDN", "EU", "UK"]
         try:
-            return (self.store.sanctions_status() or {}).get("rows", 0) > 0
+            st = self.store.sanctions_status() or {}
         except Exception:  # noqa: BLE001
-            return False
+            return []
+        lists = [k for k, v in (st.get("lists") or {}).items() if v]
+        if not lists and st.get("rows", 0) > 0:
+            lists = ["OFAC SDN", "EU"]
+        return lists
+
+    def sanctions_checked(self) -> bool:
+        return bool(self.sanctions_lists())
 
     def analysis(self, imo: int, refresh: bool = False) -> Analysis:
         self._sync()
@@ -294,7 +303,8 @@ class Service:
                 a.stats["history_since"] = (self.provider.stats() or {}).get("oldest")
             except Exception:  # noqa: BLE001
                 a.stats["history_since"] = None
-        a.verdict = verdict_mod.build(a, sanctions_checked=self.sanctions_checked())
+        lists = self.sanctions_lists()
+        a.verdict = verdict_mod.build(a, sanctions_checked=bool(lists), lists=lists)
         try:
             self.store.save_analysis(a)
         except Exception:  # the analysis is still served if the DB write fails

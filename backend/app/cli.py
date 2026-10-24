@@ -5,7 +5,7 @@
   python -m app.cli report 9000036 [--html]    step 8: PDF (or HTML) report to VVT_REPORT_DIR
   python -m app.cli region hormuz              live vessels in a region
   python -m app.cli fleet                      mock provider only: analyse the whole sample fleet
-  python -m app.cli sanctions-refresh          OFAC + EU (+ UK with UK_SANCTIONS_CSV_URL, + OpenSanctions with --opensanctions)
+  python -m app.cli sanctions-refresh          OFAC + EU + UK (FCDO list), + OpenSanctions with --opensanctions
   python -m app.cli first-pull 9000036 ...     the acceptance checklist from docs/PROVIDERS.md on real IMOs
 """
 from __future__ import annotations
@@ -51,7 +51,7 @@ def cmd_report(a):
     from app.reports.render import render_html, render_pdf
     svc = _svc()
     an = svc.analysis(a.imo)
-    html = render_html(an)
+    html = render_html(an, notes=svc.store.list_vessel_notes(a.imo), ref=svc.ref, lists=svc.sanctions_lists(), rules=dict(svc.rules))
     if a.html:
         out = f"report-{a.imo}.html"
         with open(out, "w", encoding="utf-8") as fh:

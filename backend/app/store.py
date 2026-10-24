@@ -481,7 +481,11 @@ class MemoryStore:
         return sorted(out, key=lambda r: r["first_seen"])
 
     def sanctions_status(self):
-        return {"rows": sum(len(v) for v in self.sanctions.values()), "refreshed": None}
+        lists: dict[str, int] = {}
+        for rows in self.sanctions.values():
+            for r in rows:
+                lists[r.get("list", "?")] = lists.get(r.get("list", "?"), 0) + 1
+        return {"rows": sum(len(v) for v in self.sanctions.values()), "refreshed": None, "lists": lists}
 
     def add_alert(self, imo, rule, t0_ms, severity, title, detail):
         key = (imo, rule, t0_ms // 3_600_000)
@@ -591,8 +595,10 @@ class PostgresStore:
 
     def list_sanctions(self, imo):
         with self._conn() as c:
-            rows = c.execute("SELECT list_name, programme, listed_at FROM sanctions WHERE imo=%s AND delisted_at IS NULL", (imo,)).fetchall()
-        return [{"list": r[0], "programme": r[1] or "", "t": int(datetime(r[2].year, r[2].month, r[2].day, tzinfo=timezone.utc).timestamp() * 1000)} for r in rows if r[2]]
+            rows = c.execute("SELECT list_name, programme, listed_at, refreshed_at FROM sanctions WHERE imo=%s AND delisted_at IS NULL", (imo,)).fetchall()
+        # a listing with no date still counts: it falls back to when the list was downloaded
+        return [{"list": r[0], "programme": r[1] or "",
+                 "t": int(datetime(r[2].year, r[2].month, r[2].day, tzinfo=timezone.utc).timestamp() * 1000) if r[2] else self._ms(r[3])} for r in rows]
 
     # ---- per-user state (users.email holds the token name until SSO maps real emails)
     def user_id(self, name):
@@ -730,7 +736,8 @@ class PostgresStore:
     def sanctions_status(self):
         with self._conn() as c:
             n, t = c.execute("SELECT count(*), max(refreshed_at) FROM sanctions WHERE delisted_at IS NULL").fetchone()
-        return {"rows": int(n or 0), "refreshed": self._ms(t)}
+            per = c.execute("SELECT list_name, count(*) FROM sanctions WHERE delisted_at IS NULL GROUP BY list_name").fetchall()
+        return {"rows": int(n or 0), "refreshed": self._ms(t), "lists": {r[0]: int(r[1]) for r in per}}
 
     def coverage_add(self, rows):
         if not rows:

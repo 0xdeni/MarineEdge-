@@ -1,64 +1,84 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#F2F2F7" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#000000">
+<meta name="color-scheme" content="dark light">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="MarineEdge">
-<meta name="description" content="Vessel due diligence for the Black Sea, Hormuz, Iran, Oman and the UAE: twelve months of voyages on one chart, every red flag with its evidence.">
+<meta name="format-detection" content="telephone=no">
+<meta name="description" content="Ship due diligence for the Black Sea and the Gulf: twelve months of voyages on one map, every red flag with its evidence.">
 <title>MarineEdge</title>
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="icon" href="./icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400..700;1,400..700&family=IBM+Plex+Mono:wght@400;500&display=swap">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist/maplibre-gl.css">
-<link rel="stylesheet" href="./styles.css">
-<script>window.VVT_CONFIG = { source: new URLSearchParams(location.search).get("source") || "mock", apiBase: "" };</script>
+<link rel="stylesheet" href="./vendor/maplibre/maplibre-gl.css">
+<link rel="stylesheet" href="./css/app.css">
+<script src="./js/theme.js"></script>
 </head>
 <body>
-<div class="app" id="app">
-  <main class="pages">
-    <section class="page" id="page-chart">
-      <div class="stage" id="stage">
-        <div id="basemap" aria-hidden="true"></div>
-        <canvas id="map" aria-label="Chart"></canvas>
-        <div class="mapui">
-          <div class="regions glass" id="regions" role="tablist" aria-label="Regions"></div>
-          <div class="zstack glass"><button id="zin" aria-label="Zoom in"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button><button id="zout" aria-label="Zoom out"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 12h14"/></svg></button><button id="zfit" aria-label="Fit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="6"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg></button></div>
-          <div class="attrib" id="attrib" hidden>© <a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a> © <a href="https://www.openmaptiles.org/" target="_blank" rel="noopener">OpenMapTiles</a> · data from <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a></div>
-          <div class="readout"><div class="bar" id="scalebar"><i style="--w:60px"></i><span id="scaletxt">50 nm</span></div><span id="coords">44°43.0′N 037°46.0′E</span></div>
-          <div class="loading glass" id="loading">Loading sample fleet…</div>
-        </div>
-      </div>
-      <section class="sheet glass" id="sheet" aria-label="Details">
-        <div class="grab" id="grab"><span></span></div>
-        <div class="sheet-head" id="sheetHead">
-          <div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><input id="q" type="search" autocomplete="off" spellcheck="false" placeholder="Vessel name, IMO or MMSI" aria-label="Search vessel"><button class="clear" id="qclear" hidden aria-label="Clear search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
-        </div>
-        <div class="sheet-body" id="sheetBody"></div>
-      </section>
-    </section>
-    <section class="page scroll" id="page-vessels" hidden></section>
-    <section class="page scroll" id="page-alerts" hidden></section>
-    <section class="page scroll" id="page-reports" hidden></section>
-    <section class="page scroll" id="page-profile" hidden></section>
-  </main>
-  <nav class="tabbar glass" id="tabbar" aria-label="Sections"></nav>
-</div>
-<div class="login" id="login" hidden></div>
-<div class="report" id="report" hidden></div>
-<script src="https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist/maplibre-gl.js" crossorigin="anonymous"></script>
-<script src="./geo.js"></script>
-<script src="./base.js"></script>
-<script src="./core.js"></script>
-<script src="./api.js"></script>
-<script src="./app.js"></script>
-<script>
-if ("serviceWorker" in navigator) { window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js").catch(() => {})); }
-</script>
+<div class="boot" id="boot" aria-hidden="true"><svg viewBox="0 0 512 512" width="64" height="64"><defs><linearGradient id="bootBg" x1="0" y1="0" x2="0.4" y2="1"><stop offset="0" stop-color="#12304F"/><stop offset="0.55" stop-color="#0A1A2E"/><stop offset="1" stop-color="#050C17"/></linearGradient><clipPath id="bootClip"><rect width="512" height="512" rx="115"/></clipPath></defs><rect width="512" height="512" rx="115" fill="url(#bootBg)"/><path d="M112 346 C 138 288, 158 172, 192 172 C 230 172, 228 278, 256 278 C 284 278, 282 172, 320 172 C 354 172, 370 268, 384 318" fill="none" stroke="#fff" stroke-opacity="0.9" stroke-width="38" stroke-linecap="round"/><circle cx="392" cy="342" r="34" fill="#fff"/><circle cx="392" cy="342" r="19" fill="#0A84FF"/></svg></div>
+
+<div id="map" role="application" aria-label="Map"></div>
+<div class="map-veil" id="veil"></div>
+
+<header class="chrome hide" id="homeChrome">
+  <button class="gpill tap" id="regionBtn" type="button" aria-haspopup="dialog"><span id="regionName">Black Sea</span><span style="color:var(--text-2)" aria-hidden="true"></span></button>
+  <div class="grp">
+    <button class="gbtn sm tap" id="alertsBtn" type="button" aria-label="Alerts"><span class="bell"></span><span class="badge-dot" id="alertsBadge" hidden></span></button>
+    <button class="gbtn sm tap" id="meBtn" type="button" aria-label="Profile and settings"></button>
+  </div>
+</header>
+<div class="chrome-sub hide" id="liveChip"></div>
+<header class="chrome hide" id="shipChrome">
+  <button class="gbtn tap" id="shipBack" type="button" aria-label="Back"></button>
+  <div class="grp">
+    <button class="gbtn tap" id="shipWatch" type="button" aria-label="Watch this ship" aria-pressed="false"></button>
+    <button class="gbtn tap" id="shipMore" type="button" aria-label="Share and report" aria-haspopup="dialog"></button>
+  </div>
+</header>
+
+<div class="dim" id="dim1"></div>
+<section class="sheet home" id="homeSheet" aria-label="Search and region">
+  <div class="grab"><span></span></div>
+  <div class="head" id="homeHead"></div>
+  <div class="body" id="homeBody"></div>
+</section>
+<section class="sheet" id="shipSheet" aria-label="Ship">
+  <div class="grab"><span></span></div>
+  <div class="head"></div>
+  <div class="body" id="shipBody"></div>
+</section>
+<div class="dim" id="dim2"></div>
+<section class="sheet psheet" id="pageSheet" role="dialog" aria-modal="true">
+  <div class="grab"><span></span></div>
+  <div class="head" id="pageHead"></div>
+  <div class="body" id="pageBody"></div>
+</section>
+<div class="toolbar" id="voyTools" hidden role="toolbar" aria-label="Voyage"></div>
+<div class="dim" id="dim3"></div>
+<section class="sheet psheet" id="composer" role="dialog" aria-modal="true" aria-label="Note" style="z-index:12">
+  <div class="grab"><span></span></div>
+  <div class="head" id="composerHead"></div>
+  <div class="body" id="composerBody"></div>
+</section>
+<div class="attr" id="attr"></div>
+
+<div class="pages" id="pages"></div>
+<div class="ob" id="ob" hidden></div>
+<div class="toasts" id="toasts" aria-live="polite"></div>
+
+<script src="./vendor/maplibre/maplibre-gl-csp.js"></script>
+<script src="./js/pmtiles.js"></script>
+<script src="./js/ui.js"></script>
+<script src="./js/api.js"></script>
+<script src="./js/map.js"></script>
+<script src="./js/onboarding.js"></script>
+<script src="./js/screens.js"></script>
+<script src="./js/profile.js"></script>
+<script src="./js/app.js"></script>
 </body>
 </html>

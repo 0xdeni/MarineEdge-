@@ -30,6 +30,7 @@ services:
   web:
     build: { context: ., dockerfile: frontend/Dockerfile }
     depends_on: [ api ]
+    volumes: [ "appdata:/srv/appdata:ro" ]   # the detailed map an admin downloads (maps/basemap.pmtiles), served at /tiles/
     ports: [ "8080:80" ]
     restart: unless-stopped
   caddy:

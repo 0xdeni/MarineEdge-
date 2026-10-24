@@ -6,7 +6,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from app.engine import analyze, load_refdata, load_rules
-from app.engine.types import D, H, Vessel
+from app.engine.types import D, Vessel
 from tests.synth import Track
 
 CONFIG = Path(__file__).resolve().parents[2] / "config"

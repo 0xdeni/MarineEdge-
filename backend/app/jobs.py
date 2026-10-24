@@ -24,6 +24,7 @@ logging.basicConfig(level=os.environ.get("LOG_LEVEL", "INFO"))
 
 
 def refresh(svc: Service | None = None, imos: list[int] | None = None) -> dict:
+    from app import verdict as verdict_mod
     svc = svc or Service()
     imos = imos if imos is not None else svc.store.all_watched()
     new_alerts: list[dict] = []
@@ -36,34 +37,50 @@ def refresh(svc: Service | None = None, imos: list[int] | None = None) -> dict:
             errors += 1
             continue
         for f in a.flags:
-            if svc.store.add_alert(imo, f.rule, f.t0, f.severity, f"{a.vessel.name}: {f.title}", " · ".join(f.lines[:2])):
-                new_alerts.append({"imo": imo, "rule": f.rule, "severity": f.severity, "title": f"{a.vessel.name}: {f.title}", "body": f.lines[0] if f.lines else "", "t0": f.t0})
+            st = verdict_mod.story(f, a, svc.ref)
+            title = f"{a.vessel.name}: {st['title']}"
+            if svc.store.add_alert(imo, f.rule, f.t0, f.severity, title, st["text"]):
+                new_alerts.append({"imo": imo, "rule": f.rule, "severity": f.severity, "title": title, "body": st["text"], "t0": f.t0, "key": f.key})
     pushed = notify(svc, new_alerts) if new_alerts else 0
     out = {"vessels": len(imos), "fetches": svc.fetches, "new_alerts": len(new_alerts), "pushed": pushed, "errors": errors}
     log.info("refresh %s", json.dumps(out))
     return out
 
 
+def _min_severity(svc: Service, user: str, default: str) -> str:
+    """A person's own choice (Profile › Notifications: High only, or High and Medium), else the server default."""
+    try:
+        u = svc.store.get_user_by_email(user)
+    except Exception:  # noqa: BLE001
+        u = None
+    v = ((u or {}).get("prefs") or {}).get("pushMin")
+    return v if v in ("high", "medium") else default
+
+
 def notify(svc: Service, alerts: list[dict]) -> int:
-    """Push each new alert to the subscriptions of users who watch that vessel. High flags only by
-    default; set PUSH_MIN_SEVERITY=medium to include Medium."""
-    min_sev = os.environ.get("PUSH_MIN_SEVERITY", "high")
+    """Push each new alert to the subscriptions of the people who watch that vessel: High findings by default,
+    High and Medium for people who chose that in the app (PUSH_MIN_SEVERITY sets the server default)."""
+    default = os.environ.get("PUSH_MIN_SEVERITY", "high")
     rank = {"high": 2, "medium": 1, "info": 0}
     sent = 0
     subs = svc.store.list_push_subscriptions()
     if not subs:
         return 0
     watchers: dict[int, set[str]] = {}
+    mins: dict[str, str] = {}
     for s in subs:
-        for imo in svc.store.get_watchlist(s["user"]):
-            watchers.setdefault(imo, set()).add(s["user"])
+        if s["user"] not in mins:
+            mins[s["user"]] = _min_severity(svc, s["user"], default)
+            for imo in svc.store.get_watchlist(s["user"]):
+                watchers.setdefault(imo, set()).add(s["user"])
     for al in alerts:
-        if rank.get(al["severity"], 0) < rank.get(min_sev, 2):
-            continue
         for s in subs:
             if s["user"] not in watchers.get(al["imo"], set()):
                 continue
-            payload = {"title": al["title"], "body": al["body"], "url": f"#imo{al['imo']}", "tag": f"{al['imo']}-{al['rule']}"}
+            if rank.get(al["severity"], 0) < rank.get(mins.get(s["user"], default), 2):
+                continue
+            url = f"#/ship/{al['imo']}/finding/{al['key']}" if al.get("key") else f"#/ship/{al['imo']}"
+            payload = {"title": al["title"], "body": al["body"], "url": url, "tag": f"{al['imo']}-{al.get('key') or al['rule']}"}
             try:
                 if push.send(s["sub"], payload):
                     sent += 1

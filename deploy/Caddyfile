@@ -1,7 +1,9 @@
 # MarineEdge · reverse proxy with automatic HTTPS (Let's Encrypt). DOMAIN comes from .env
 # (a real domain with an A record, or <ip>.sslip.io which install.sh picks when no domain is given).
 {$DOMAIN} {
-  encode zstd gzip
+  # compress everything except the detailed map, which is read with range requests
+  @compressible not path /tiles/*
+  encode @compressible zstd gzip
   # API → FastAPI container
   handle /api/* {
     reverse_proxy api:8000

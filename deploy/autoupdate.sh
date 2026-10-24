@@ -5,7 +5,7 @@
 #   3. run the whole test suite inside that image (in-memory store, no credits, no DB writes)
 #   4. only when green: switch the stack over, apply migrations, wait for /api/health
 #   5. if anything fails: put the previous commit back, keep the old containers running
-# The verdict is written to state/update.json, which the app shows under Profile › AIS provider › Server
+# The verdict is written to state/update.json, which the app shows under Profile › Server › Updates
 # updates, so the owner sees green/red on the phone without GitHub Actions. Remove
 # /etc/cron.d/marineedge-update to stop auto-updating.
 set -uo pipefail
@@ -35,8 +35,8 @@ fi
 echo "== $(now) candidate $LOCAL → $REMOTE"
 git reset -q --hard origin/main
 
-# 2. build the new image (the running containers keep serving the old one)
-if ! BUILD=$(docker compose build api 2>&1 | tail -n 30); then
+# 2. build the new images (the running containers keep serving the old ones); a broken web image stops the update too
+if ! BUILD=$(docker compose build api web 2>&1 | tail -n 30); then
   echo "$BUILD"; echo "== build failed, staying on $LOCAL"
   write_state "build_failed" "" "$BUILD"; git reset -q --hard "$LOCAL"; exit 0
 fi
@@ -79,6 +79,10 @@ for _ in $(seq 1 30); do
 done
 if [ "$HEALTHY" = "1" ]; then
   write_state "ok" "$SUMMARY" "healthy $(now)"
+  # scheduled jobs travel with the code: new entries (e.g. the background checks) reach the server with the update
+  if [ -w /etc/cron.d ] && ! cmp -s deploy/cron.d-marineedge /etc/cron.d/marineedge; then
+    install -m 0644 deploy/cron.d-marineedge /etc/cron.d/marineedge && echo "== cron entries updated"
+  fi
   docker image prune -f >/dev/null 2>&1 || true
   echo "== updated to $REMOTE"
   exit 0

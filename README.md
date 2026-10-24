@@ -1,67 +1,56 @@
 # MarineEdge
 
-Vessel due diligence for grain, oilseed, vegetable-oil and dry-bulk desks working the Black Sea, the Strait of Hormuz and the Gulf. Type a name or IMO, see twelve months of voyages on one chart, every red flag with its evidence, and export a PDF report.
+Ship due diligence for grain, oilseed, vegetable-oil and dry-bulk desks working the Black Sea, the Strait of Hormuz and the Gulf. Type a name, a former name, an IMO or MMSI number and see the ship's last twelve months: every voyage on one map, every red flag with its evidence, a one-sentence verdict, team notes, and a PDF report.
 
-Mobile-first PWA (installs on a phone, works offline) + FastAPI/PostGIS backend + a rule engine with seven red-flag rules. Read `docs/BRIEF.md` for the full specification and `docs/STATUS.md` for where things stand.
+An iPhone-first web app (installs to the Home Screen, works offline for ships you opened) on a FastAPI/PostGIS backend with a rule engine of seven red-flag rules. It records the free aisstream.io AIS feed on your own server; history for a specific ship can be bought once from Datalastic. Read `docs/BRIEF.md` for the specification and `docs/STATUS.md` for where things stand.
 
-## Run it in two minutes (no API key)
+## Run it on a laptop (no key, no database)
 
 ```bash
-cd backend
-pip install -e ".[dev]"                 # or: pip install fastapi "uvicorn[standard]" pyyaml jinja2 requests playwright
-VVT_PROVIDER=mock uvicorn app.main:app --reload --port 8000
-# in another shell
-cd frontend/public && python3 -m http.server 8080
+make dev            # = cd backend && API_TOKENS=admin:dev-setup-code:admin python3 -m app.devserver
 ```
 
-Or, with nothing installed but PyYAML: `cd backend && VVT_PROVIDER=mock python -m app.devserver` serves both on :8080.
+Open `http://localhost:8080`, tap **Get started › Create account** and use `dev-setup-code` as the server admin password. The development server shows a generated demo fleet (`AZOV CRESCENT`, `LEVANT STAR`, `SILVER REACH`, `DOBRUJA STAR` are the interesting ones) — a real server never does. It needs only Python and PyYAML; the PDF needs Playwright's Chromium.
 
-Open `http://localhost:8080/?source=server` (backend) or `http://localhost:8080/` (everything in the browser). Any email signs in to the demo. Sample fleet of 40 fictional vessels with generated tracks; `HORMUZ QUEEN`, `KUBAN SPIRIT` and `LEVANT STAR` are the interesting ones.
-
-Full stack with PostGIS: `cp .env.example .env && docker compose up --build`, then `http://localhost:8080`.
+Full stack with PostGIS: `cp .env.example .env`, set `API_TOKENS` (and `VVT_PROVIDER=mock` + `VVT_ALLOW_MOCK=1` for the demo fleet), then `docker compose up --build` and open `http://localhost:8080`.
 
 ## Tests
 
 ```bash
-cd backend && pytest -q          # or: python -m tests.run
+make test           # pytest -q, or python -m tests.run without pytest
 ```
 
-29 tests: 19 on synthetic tracks (clean, port calls, anchorage merge, voyages, each of the seven rules with positive and negative cases) 4 on sanctions-list fixtures (OFAC, EU, UK, OpenSanctions), 4 on the service layer (cache rule, incremental fetch, user state, alert de-duplication) and 2 regression tests on the generated fleet.
+65 tests: the seven rules and the voyage functions on synthetic tracks, sanctions-list parsers (OFAC, EU, UK FCDO, OpenSanctions), the service (fetch-once cache, incremental fetch, alerts), accounts (setup, invites, rate limits, resets, sessions), the HTTP router (auth levels, CSRF, notes permissions, no demo fleet on a server), the verdict wording, the report and notifications, the recorded feed, and PostgresStore (fully against PostGIS when `DATABASE_URL` is set).
 
 ## Command line
 
 ```bash
 cd backend
-python -m app.cli search hormuz            # candidates with IMO
-python -m app.cli pull 9000036             # fetch (cached) + analyse, prints stats and flags
-python -m app.cli report 9000036           # PDF
-python -m app.cli first-pull 9000036 …     # acceptance checks on real IMOs once a key is in .env
+python -m app.cli search silver            # candidates with IMO
+python -m app.cli pull 9000013             # fetch (cached) + analyse, prints stats and flags
+python -m app.cli report 9000013           # PDF
+python -m app.cli first-pull 9321483 …     # acceptance checks on real IMOs once a Datalastic key is set
 ```
 
-## Switching to a real AIS provider
-
-Put the key in `.env`, set `VVT_PROVIDER=datalastic` (or `kpler` once the adapter is filled in), restart. Nothing else changes; see `docs/PROVIDERS.md` for the trial checklist and the first-pull sanity checks. Free alternative: the `recorder` container records aisstream.io live AIS into your own database from day one (provider `aisstream`, zero credits) — trade-offs in `docs/FREE-STACK.md`.
-
-## API
+## API (all under `/api`, JSON; the app uses a session cookie, scripts a `Bearer` API token)
 
 | Route | What |
 |---|---|
-| `GET /api/health` | provider, rules, zones |
-| `GET /api/vessels/search?q=` | name, IMO or MMSI → candidates |
-| `GET /api/vessels/{imo}` | particulars |
-| `GET /api/vessels/{imo}/analysis` | track, port calls, voyages, flags, status (cached fetch) |
-| `GET /api/regions/{blacksea,hormuz,iran,oman,uae}/vessels` | live positions in the region |
-| `POST /api/vessels/{imo}/report?fmt=pdf` | PDF report |
-| `GET /api/rules` · `POST /api/rules/reload` | thresholds from `config/rules.yaml` |
-| `GET /api/me` · `PUT /api/me/watchlist` · `GET/PUT /api/me/notes/{imo}[/{n}]` | per-user watchlist and analyst notes |
-| `GET /api/alerts` · `POST /api/jobs/refresh` | alerts raised by the refresh job; manual trigger |
-| `POST/DELETE /api/push/subscribe` | Web Push subscriptions (VAPID) |
-| `POST /api/zones/{id}` `{enabled}` | toggle a sensitive zone |
+| `GET /health` · `GET /auth/state` | liveness; whether the server needs its first account |
+| `POST /auth/signup · /login · /logout · /forgot · /reset` | accounts |
+| `GET/PATCH /me` · `POST /me/password` · `GET /me/sessions` | profile, preferences, devices |
+| `GET /regions/{id}/overview` · `GET /regions/{id}/vessels` | the region now: counts, highest risk, live positions |
+| `GET /vessels/search?q=` | name, former name, IMO or MMSI |
+| `GET /vessels/{imo}/analysis` | track, voyages, findings with stories, verdict, status |
+| `GET /vessels/{imo}/report.pdf` | the PDF report |
+| `GET/POST /vessels/{imo}/notes` · `PATCH/DELETE /notes/{id}` | team notes |
+| `GET /alerts` · `PUT /me/watchlist` · `POST/DELETE /push/subscribe` | watching and alerts |
+| `/admin/…` | data sources, team and invites, email, rules, zones, maps, jobs (admins) |
 
 ## Deploy
 
-One paste: `deploy/cloud-init.yaml` into any Ubuntu 24.04 cloud server's user-data field (Hetzner, DigitalOcean, Vultr). It installs Docker, PostGIS, the API, the web app and Caddy with HTTPS, and auto-updates from GitHub. Then everything else is done inside the app. Details: `docs/DEPLOY.md`.
+One paste: `deploy/cloud-init.yaml` into an Ubuntu server's user-data field (AWS, Google Cloud, Oracle, Hetzner…). It installs Docker, PostGIS, the API, the recorder, the web app and Caddy with HTTPS, and updates itself from GitHub behind the test suite. Everything else is done inside the app. Details: `docs/DEPLOY.md`.
 
 ## Layout
 
-See `CLAUDE.md`.
+See `CLAUDE.md`. Map data: Natural Earth (public domain), OpenStreetMap contributors (ODbL) via Protomaps; map engine MapLibre GL JS (BSD-3-Clause); map fonts Noto Sans (OFL).

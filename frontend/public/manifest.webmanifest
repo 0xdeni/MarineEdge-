@@ -1,13 +1,15 @@
 {
   "name": "MarineEdge",
   "short_name": "MarineEdge",
-  "description": "Vessel due diligence for the Black Sea, Hormuz, Iran, Oman and the UAE.",
-  "start_url": "./index.html",
+  "description": "Ship due diligence for the Black Sea and the Gulf: twelve months of voyages on one map, every red flag with its evidence.",
+  "id": "./",
+  "start_url": "./#/",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#F2F2F7",
-  "theme_color": "#007AFF",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "categories": ["business", "navigation", "productivity"],
   "icons": [
     { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
     { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
@@ -15,8 +17,7 @@
     { "src": "icons/icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ],
   "shortcuts": [
-    { "name": "Black Sea", "url": "./index.html#blacksea" },
-    { "name": "Hormuz", "url": "./index.html#hormuz" },
-    { "name": "Alerts", "url": "./index.html#alerts" }
+    { "name": "Search ships", "short_name": "Search", "url": "./#/search" },
+    { "name": "Alerts", "url": "./#/alerts" }
   ]
 }

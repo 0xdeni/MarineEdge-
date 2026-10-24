@@ -17,6 +17,19 @@ def public_key() -> str:
     return os.environ.get("VAPID_PUBLIC_KEY", "")
 
 
+def subject() -> str:
+    """Who to contact about this sender. Apple's push service rejects placeholder addresses, so without
+    VAPID_SUBJECT the server's own https address is used (DOMAIN or PUBLIC_URL from .env)."""
+    v = (os.environ.get("VAPID_SUBJECT") or "").strip()
+    if v and "yourcompany" not in v and "example.com" not in v:
+        return v
+    url = (os.environ.get("PUBLIC_URL") or "").strip().rstrip("/")
+    if url.startswith("https://"):
+        return url
+    dom = (os.environ.get("DOMAIN") or "").strip()
+    return f"https://{dom}" if dom and dom != "localhost" else "mailto:admin@localhost"
+
+
 def configured() -> bool:
     return bool(os.environ.get("VAPID_PUBLIC_KEY") and os.environ.get("VAPID_PRIVATE_KEY"))
 
@@ -34,7 +47,7 @@ def send(sub: dict, payload: dict) -> bool:
         return False
     try:
         webpush(subscription_info=sub, data=json.dumps(payload), vapid_private_key=os.environ["VAPID_PRIVATE_KEY"],
-                vapid_claims={"sub": os.environ.get("VAPID_SUBJECT", "mailto:ops@example.com")}, ttl=6 * 3600)
+                vapid_claims={"sub": subject()}, ttl=6 * 3600)
         return True
     except WebPushException as e:  # pragma: no cover - network
         status = getattr(getattr(e, "response", None), "status_code", None)

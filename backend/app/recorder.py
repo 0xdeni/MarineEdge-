@@ -51,6 +51,43 @@ def angle_diff(a: float, b: float) -> float:
     return 360.0 - d if d > 180.0 else d
 
 
+STATUS_FILE = "recorder.json"
+
+
+def write_status(**fields) -> None:
+    """What the recorder is doing, for Profile › Data sources: no_key | connecting | connected | error."""
+    import json as _json
+    p = settings_store.DATA_DIR / STATUS_FILE
+    try:
+        cur = _json.loads(p.read_text()) if p.exists() else {}
+    except (OSError, ValueError):
+        cur = {}
+    if fields.get("state") and fields["state"] != cur.get("state"):
+        cur["since"] = int(time.time() * 1000)
+    cur.update(fields)
+    cur["updated"] = int(time.time() * 1000)
+    try:
+        p.parent.mkdir(parents=True, exist_ok=True)
+        tmp = p.with_suffix(".tmp")
+        tmp.write_text(_json.dumps(cur))
+        tmp.replace(p)
+    except OSError:
+        pass
+
+
+def read_status() -> dict:
+    """The recorder's last status; 'stopped' when it hasn't written for 10 minutes."""
+    import json as _json
+    p = settings_store.DATA_DIR / STATUS_FILE
+    try:
+        st = _json.loads(p.read_text()) if p.exists() else {}
+    except (OSError, ValueError):
+        st = {}
+    if st and time.time() * 1000 - (st.get("updated") or 0) > 10 * 60_000:
+        st = {**st, "state": "stopped"}
+    return st
+
+
 def current_key() -> str:
     return settings_store.provider_key("aisstream") or os.environ.get("AISSTREAM_API_KEY", "")
 
@@ -142,6 +179,11 @@ class Recorder:
         return any(a <= int(type_code) <= b for a, b in self.keep)
 
     def handle(self, obj: dict) -> None:
+        if isinstance(obj, dict) and obj.get("error"):          # aisstream says why it refuses (bad key, bad subscription)
+            self.last_error = str(obj["error"])[:200]
+            write_status(state="error", error=self.last_error)
+            log.warning("aisstream: %s", self.last_error)
+            return
         parsed = parse_message(obj)
         if parsed is None:
             self.counts["unparsed"] += 1
@@ -210,14 +252,17 @@ class Recorder:
         while not self.stop:
             key = current_key()
             if not key:
-                log.warning("no aisstream key yet: paste it in the app (Profile › AIS provider › aisstream.io); retrying in 60 s")
-                await asyncio.sleep(60)
+                write_status(state="no_key", error=None)
+                log.warning("no aisstream key yet: paste it in the app (Profile › Data sources); retrying in 30 s")
+                await asyncio.sleep(30)
                 continue
+            write_status(state="connecting")
+            got_first = False
             try:
                 async with websockets.connect(WS_URL, max_size=2**20, ping_interval=20, ping_timeout=20, compression="deflate") as ws:
                     await ws.send(json.dumps({"APIKey": key, "BoundingBoxes": self.boxes, "FilterMessageTypes": ["PositionReport", "ShipStaticData", "StandardClassBPositionReport"]}))
                     log.info("subscribed to %d boxes", len(self.boxes))
-                    backoff = 2
+                    n0 = self.counts.get("received", 0) + self.counts.get("static", 0)
                     async for raw in ws:
                         try:
                             self.handle(json.loads(raw))
@@ -225,12 +270,18 @@ class Recorder:
                             self.counts["unparsed"] += 1
                             log.exception("bad message")
                         now = time.time()
+                        if not got_first and self.counts.get("received", 0) + self.counts.get("static", 0) > n0:
+                            got_first = True
+                            backoff = 2
+                            self.last_error = None
+                            write_status(state="connected", error=None)
                         if now - last_flush >= FLUSH_EVERY:
                             self.flush()
                             last_flush = now
                         if now - last_stats >= STATS_EVERY:
                             log.info("stats %s", json.dumps(self.counts))
                             last_stats = now
+                            write_status(state="connected", counts=dict(self.counts))
                         if now - last_disk >= DISK_CHECK_EVERY:
                             last_disk = now
                             self.check_disk()
@@ -241,6 +292,13 @@ class Recorder:
                                 break
             except Exception as e:  # noqa: BLE001  network errors, closed sockets, auth rejections
                 log.warning("connection ended: %s; reconnecting in %d s", str(e)[:200], backoff)
+                write_status(state="error", error=getattr(self, "last_error", None) or str(e)[:200])
+                self.flush()
+                await asyncio.sleep(backoff)
+                backoff = min(120, backoff * 2)
+                continue
+            if not got_first and not self.stop:           # closed by the server before any data (e.g. a refused key): don't hammer it
+                write_status(state="error", error=getattr(self, "last_error", None) or "the feed closed the connection without sending data")
                 self.flush()
                 await asyncio.sleep(backoff)
                 backoff = min(120, backoff * 2)

@@ -15,7 +15,7 @@ exec > >(tee -a "$LOG") 2>&1
 echo "== MarineEdge install $(date -u +%FT%TZ)"
 
 # 1. Settings from the cloud-init file (if any)
-ADMIN_TOKEN=""; DOMAIN=""; AUTO_UPDATE="1"; GITHUB_TOKEN=""; PROVIDER="mock"; DATALASTIC_API_KEY=""
+ADMIN_TOKEN=""; DOMAIN=""; AUTO_UPDATE="1"; GITHUB_TOKEN=""; PROVIDER="aisstream"; DATALASTIC_API_KEY=""
 if [ -f "$SETUP_ENV" ]; then
   # shellcheck disable=SC1090
   set -a; . "$SETUP_ENV"; set +a
@@ -192,4 +192,5 @@ else
   echo "== API not answering yet; check: docker compose logs api"
 fi
 echo "== MarineEdge is at https://${DOMAIN}  (certificate appears within a minute of DNS/IP being reachable)"
-echo "== Sign in with any email and the admin token. Then Profile › AIS provider: aisstream.io (free) or Datalastic."
+echo "== Open the address on your iPhone, tap Get started › Create account and use the admin token as the server admin password."
+echo "== Then paste the free aisstream.io key on the map screen (or Profile › Data sources) and recording starts within a minute."
