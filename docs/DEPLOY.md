@@ -6,7 +6,7 @@ keys, email, rules, zones, watchlist, push) is done inside the app.
 
 ## 1. Create the server (5 minutes)
 
-Hetzner Cloud (recommended, ~€4–8/month), DigitalOcean, Vultr or Scaleway all take a cloud-init file. **Oracle Cloud Always Free** (€0, VM.Standard.A1.Flex **2 OCPU / 12 GB** since June 2026, Ubuntu 24.04) works with the same paste — put it under Advanced › Cloud-init, and afterwards add ingress rules for TCP 80 and 443 to the instance's VCN security list; the installer opens the same ports in the image's own firewall. See `docs/FREE-STACK.md` for the trade-offs.
+The live server runs on an AWS Free-plan trial (t4g.small, Arm, 2 GB); `docs/FREE-STACK.md` has its click path and the other free options. Hetzner Cloud (~€4–8/month), DigitalOcean, Vultr or Scaleway all take the same cloud-init file. **Oracle Cloud Always Free** (€0, VM.Standard.A1.Flex **2 OCPU / 12 GB** since June 2026, Ubuntu 24.04) works with the same paste — put it under Advanced › Cloud-init, and afterwards add ingress rules for TCP 80 and 443 to the instance's VCN security list; the installer opens the same ports in the image's own firewall. See `docs/FREE-STACK.md` for the trade-offs.
 
 1. Open `deploy/cloud-init.yaml` on GitHub, tap Raw, select all, copy.
 2. In the provider's "create server" screen pick **Ubuntu 24.04**, the smallest 2 vCPU / 4 GB size, any EU location.
@@ -38,7 +38,7 @@ The server pulls every new commit from GitHub within 10 minutes (`AUTO_UPDATE=1`
 
 ## 3. What runs on the server
 
-`install.sh` installs Docker, clones the repo to `/opt/marineedge`, writes `.env` (random database password, your admin token, push keys), and starts five containers: PostGIS, the API, the **recorder** (one websocket to aisstream.io, idle until a key is pasted in the app), the web app, and Caddy (automatic HTTPS). Cron runs the nightly backup (03:00), the sanctions refresh (04:30; OFAC SDN, EU and the FCDO UK list), the watchlist refresh (every 30 min), the background check of ships in range (every 20 min, recorded data, free), the auto-update (every 10 min) and the daily `prune-live` job (thins recorded positions older than 30 days to one per 15 minutes, deletes them after 14 months — all three numbers in `rules.yaml › live`). Logs: `/var/log/marineedge-*.log`; recorder logs with `docker compose logs -f recorder`.
+`install.sh` installs Docker, clones the repo to `/opt/marineedge`, writes `.env` (random database password, your admin token, push keys), and starts five containers: PostGIS, the API, the **recorder** (one websocket to aisstream.io, idle until a key is pasted in the app), the web app, and Caddy (automatic HTTPS). Cron runs the nightly backup (03:00), the sanctions refresh (04:30; OFAC SDN, EU and the FCDO UK list), the watchlist refresh (every 30 min), the background check of ships in range (every 20 min, recorded data, free), the auto-update (every 10 min) and the daily `prune-live` job (thins recorded positions older than 30 days to one per 30 minutes, deletes them after 14 months — all three numbers in `rules.yaml › live`). Logs: `/var/log/marineedge-*.log`; recorder logs with `docker compose logs -f recorder`.
 
 ## 4. With a terminal (optional)
 

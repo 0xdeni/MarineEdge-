@@ -1,12 +1,12 @@
-# Status — 24 Oct 2026, evening
+# Status — 24 Oct 2026, morning (São Paulo)
 
-Links: repo https://github.com/0xdeni/MarineEdge- · approved redesign (round 2) https://claude.ai/artifact/FDkxLFJcLM4yhuuFj9CDhR · owner checklist `docs/OWNER-CHECKLIST.md`
+Links: repo https://github.com/0xdeni/MarineEdge- · approved redesign (round 2) https://claude.ai/artifact/FDkxLFJcLM4yhuuFj9CDhR · owner checklist `docs/OWNER-CHECKLIST.md` · what it does and how it compares `docs/PRODUCT.md` · how findings are decided `docs/METHODOLOGY.md`
 
 **Live since 24 Oct 04:03 (São Paulo):** AWS Free-plan trial, t4g.small (2 Arm cores, 2 GB), Ubuntu, us-east-1, `https://44-197-249-76.sslip.io`. It updates itself from GitHub `main` every 10 minutes, and only after the full test suite, the migrations and the PostGIS store test pass on a scratch database. The trial ends six months after sign-up (late April 2027): an in-app export/import comes before then.
 
-## Version 1.0 — the approved redesign, built (24 Oct)
+## Version 1.0 — the approved redesign, live (24 Oct)
 
-On branch `redesign-r2`, with a pull request into `main`; the server installs it within 10 minutes of the merge, behind its usual gate.
+Pushed to `main` on 24 Oct at about 09:10 (São Paulo) and installed by the server's update gate within 15 minutes: `/api/health` reports version 1.0.0 with accounts, and the server is waiting for its first (owner) account.
 
 Everything on screen now comes from the server; the app has no demo data of its own any more, and a server refuses the generated demo fleet (only a development machine with `VVT_ALLOW_MOCK=1` shows it).
 
@@ -35,9 +35,18 @@ Everything on screen now comes from the server; the app has no demo data of its 
 
 ## Needs the owner (all from the iPhone)
 
-1. Once 1.0 is merged into `main` (the server installs it within 10 minutes): Get started › Create account, with the admin password as the server admin password. Signing in the old way (your email and the admin password) also works once and becomes the owner account; notes from the old sign-in carry over.
-2. Paste the free aisstream.io key on the map screen. Recording starts within a minute; Profile › Data sources shows whether aisstream accepts it.
-3. Optional now: Datalastic key (12 months per ship), GFW token, email settings, detailed maps download.
+1. Done 24 Oct, 09:37: the owner account exists. If it was made by signing in the old way, its password is the admin password: change it in Profile › Password.
+2. Paste the free aisstream.io key on the map screen if it asks for it. Recording starts within a minute; Profile › Data sources shows whether aisstream accepts it.
+3. Decide on the Syria zone: the US ended its Syria sanctions programme in 2025 and the EU and UK lifted most economic sanctions, so a Syrian port call is no longer a breach in itself (details in `docs/METHODOLOGY.md`). Keep it on if your policy still treats Syria as high-risk, or switch it off in Profile › Sensitive zones.
+4. Global Fishing Watch: ask them for a licence before adding the token (their free terms exclude internal use that supports a business).
+5. Optional now: Datalastic key (12 months per ship), email settings, detailed maps download.
+
+## Since the release (24 Oct)
+
+- **iPhone fixes (pushed about 09:53):** the Home Screen app stopped a status bar short of the bottom edge, showing a grey or black strip, on the owner's iOS 27.0.1. iOS gives a page shorter than the screen a viewport that ends early (WebKit bug 301108, reported since iOS 26); the page is now at least as tall as the screen. Also: the keyboard closes as soon as sign-in is sent, and the map re-frames the region once it has gone (it was showing the Mediterranean). To confirm on the phone.
+- **Sanctions rule fixed.** A ship stayed flagged only if the server had first seen its listing in the last 12 months, so a year after the first download every long-standing listing would have stopped counting. Now a listing in force counts however old it is; the finding says "on the list since at least <date>" (the server's first sighting, not the official listing date). New test.
+- **Documentation for people and agents:** `README.md` rewritten; `docs/PRODUCT.md` (capabilities and how MarineEdge compares), `docs/METHODOLOGY.md` (every rule, the verdict, the official guidance behind each red flag), `docs/API.md` (every route), `AGENTS.md` (rules for AI coding agents; `CLAUDE.md` imports it), `llms.txt`; ARCHITECTURE, PROVIDERS, FREE-STACK and DEPLOY brought up to date; stale comments in the code fixed.
+- **Lint pinned** to ruff's classic rules in `backend/pyproject.toml`, so `make lint` means the same with any ruff version (clean).
 
 ## Unverified (no access from this workspace)
 
@@ -59,5 +68,9 @@ Everything on screen now comes from the server; the app has no demo data of its 
 
 1. World Port Index import (`scripts/import_wpi.py`), then validate port calls on real tracks.
 2. Datalastic mapping on a live response, first pull of 5–10 real ships including a known dark-voyage case (M2/M3).
-3. In-app export/import before the AWS trial ends; off-site backups when a bucket exists.
-4. Kpler adapter when their answers arrive.
+3. Import the EU's list of ships banned from EU ports and services (Annex XLII of Regulation 833/2014, 673 ships after the 21st package), which is separate from the EU financial-sanctions file the server downloads today; then check every ship-to-ship partner against the lists and weigh night-time transfers (`docs/METHODOLOGY.md` § 5).
+4. Ships removed from a sanctions list: keep flagging them for 12 months after removal, as the brief asks (the server already records the removal date; the rule, the ship page and the report need it).
+5. Screen the registered owner, manager and operator against the lists when a paid source supplies their names.
+6. Check the real-data false positives: in the first hours on the live server, 42 of 108 ships in range were High risk, many of them clustered at the Bosphorus anchorages. Likely cause: ships anchored near each other there count as ship-to-ship stops, because those anchorages are not in the port list. Confirm from "See all", then add the Turkish Straits anchorages (and others) or require ships at anchor to be alongside.
+7. In-app export/import before the AWS trial ends; off-site backups when a bucket exists (the runtime settings file too, which the database dump leaves out).
+8. Kpler adapter when their answers arrive.
