@@ -420,12 +420,15 @@ const RULE_LIST = [
     const out = [];
     for (let i = 1; i < c.track.length; i++) {
       const a = c.track[i - 1], b = c.track[i], dt = b.t - a.t;
-      if (dt < RULES.aisGap.minHours * H || c.inPort[i - 1] || c.inPort[i]) continue;
-      const nz = nearestZone(a.lon, a.lat), hours = dt / H;
-      const high = hours > RULES.aisGap.highHours || nz.nm <= RULES.aisGap.nearSensitiveNm;
+      // only a gap wholly inside one port stay is harmless; dark at sea and back on in port counts (same as rules.py)
+      if (dt < RULES.aisGap.minHours * H || (c.inPort[i - 1] && c.inPort[i])) continue;
+      const nz = nearestZone(a.lon, a.lat), nb = nearestZone(b.lon, b.lat), hours = dt / H;
+      const high = hours > RULES.aisGap.highHours || Math.min(nz.nm, nb.nm) <= RULES.aisGap.nearSensitiveNm;
+      let back = `Reappeared ${Math.round(nmDist(a.lat, a.lon, b.lat, b.lon))} nm away`;
+      if (nb.zone && nb.nm < nz.nm) back += ` · ${nb.nm === 0 ? 'inside ' + nb.zone.name : Math.round(nb.nm) + ' nm from ' + nb.zone.name}`;
       out.push({ rule: 'AIS gap', severity: high ? 'high' : 'medium', t0: a.t, t1: b.t, lat: a.lat, lon: a.lon, hours, idx: i,
         title: `AIS gap of ${Math.round(hours)} hours`,
-        lines: [`Off ${fmtDT(a.t)}, back on ${fmtDT(b.t)} ${TZ()}`, `Last position ${fmtDM(a.lat, a.lon)} · ${Math.round(nz.nm)} nm from ${nz.zone.name}`, `Reappeared ${Math.round(nmDist(a.lat, a.lon, b.lat, b.lon))} nm away · ${a.src === 'S' ? 'satellite' : 'terrestrial'} AIS before the gap`],
+        lines: [`Off ${fmtDT(a.t)}, back on ${fmtDT(b.t)} ${TZ()}`, `Last position ${fmtDM(a.lat, a.lon)} · ${Math.round(nz.nm)} nm from ${nz.zone.name}`, `${back} · ${a.src === 'S' ? 'satellite' : 'terrestrial'} AIS before the gap`],
         evidence: { before: c.track.slice(Math.max(0, i - 3), i), after: c.track.slice(i, i + 3) } });
     }
     return out;

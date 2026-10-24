@@ -100,6 +100,19 @@ def test_ais_gap_high_near_sensitive_zone():
     assert len(gaps) == 1 and gaps[0].severity == "high", [(f.severity, f.lines) for f in gaps]
 
 
+def test_ais_gap_ending_moored_in_a_sanctioned_port_is_high():
+    # Poti → Feodosia: AIS off half-way across, first fix back on is already moored in Feodosia (Crimea).
+    # The gap starts more than 100 nm from Crimea and is under 24 h, so only its end makes it High.
+    from dataclasses import replace
+    tr = Track(T0, P["POT"].lat, P["POT"].lon).moor(12).sail_to_port(P["FEO"], gap=(0.5, 100))
+    tr.pts[-1] = replace(tr.pts[-1], sog=0.0, nav=5)
+    tr.moor(24)
+    a = run(tr)
+    gaps = [f for f in a.flags if f.rule == "AIS gap"]
+    assert len(gaps) == 1 and gaps[0].severity == "high" and gaps[0].hours < 24, [(f.severity, f.hours, f.lines) for f in gaps]
+    assert "inside Crimea" in gaps[0].lines[2]
+
+
 def test_no_gap_flag_while_in_port():
     tr = Track(T0, P["CND"].lat, P["CND"].lon).moor(48)      # fixes every 3 h: never a gap
     a = run(tr)

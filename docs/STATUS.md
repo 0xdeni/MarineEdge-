@@ -1,6 +1,6 @@
 # Status — 24 Oct 2026
 
-Links: repo https://github.com/0xdeni/MarineEdge- · PWA prototype https://claude.ai/artifact/58pvuQYeUG1SCMQPxCPUBF · website canvas https://claude.ai/artifact/4oWLpjGRkTYuwPXWBpYgmi · owner checklist `docs/OWNER-CHECKLIST.md`
+Links: repo https://github.com/0xdeni/MarineEdge- · PWA prototype https://claude.ai/artifact/58pvuQYeUG1SCMQPxCPUBF · website canvas https://claude.ai/artifact/4oWLpjGRkTYuwPXWBpYgmi · **redesign mockups (for sign-off)** https://claude.ai/artifact/FDkxLFJcLM4yhuuFj9CDhR · owner checklist `docs/OWNER-CHECKLIST.md`
 
 **Live since 24 Oct 04:03 (São Paulo):** first server on an AWS Free-plan trial — t4g.small (2 Arm cores, 2 GB), Ubuntu 26.04, us-east-1, `https://44-197-249-76.sslip.io`. Installed from the owner's iPhone through EC2 Instance Connect; updates itself from GitHub every 10 minutes, each update gated by the full test suite plus migrations and the PostGIS store test on a scratch database. The trial ends six months after sign-up (late April 2027): an in-app export/import is the next engineering item.
 
@@ -19,7 +19,7 @@ Links: repo https://github.com/0xdeni/MarineEdge- · PWA prototype https://claud
 1. Live map on the recorded feed (in the update queue; verify on the owner's phone).
 2. Real history: a Datalastic trial key → first pull of 5–10 real vessels including one known AIS-gap case → validate voyages, ports and flags against reality (M2/M3 acceptance). Needs the owner.
 3. Real-data hardening: World Port Index fetched and imported on the server; server-side search across recorded and provider data; PDF verified on the server; off-site backups.
-4. Redesign from the brief's two screens, with clickable mockups for sign-off before rebuilding: search-first home; one vessel page that reads like the report (plain-language verdict, voyage map, voyage list, findings with evidence); dense, quiet typography; no fake features; technical details behind a disclosure.
+4. Redesign from the brief's two screens — **clickable mockups ready for sign-off (24 Oct)**, rebuild after approval: search-first home; one vessel page that reads like the report (plain-language verdict, voyage map, voyage list, findings with evidence); dense, quiet typography; no fake features; technical details behind a disclosure.
 
 ## UI/UX state (reviewed 23 Oct at iPhone 15 size, every screen, light and dark)
 
@@ -55,6 +55,7 @@ See `docs/OWNER-CHECKLIST.md`. Shortest version: create a server with the cloud-
 
 ## Known gaps
 
+- **AIS-gap rule missed the classic evasion pattern (found 24 Oct while drafting the redesign):** a gap whose first fix back on was already inside a port call was skipped, so a ship that went dark at sea and reappeared moored in Feodosia raised nothing. Now only a gap lying wholly inside one port stay is ignored, and the gap is judged by whichever end is nearer a sensitive zone ("back on inside Crimea" makes it High). Same change in the browser engine; new test `test_ais_gap_ending_moored_in_a_sanctioned_port_is_high`. The demo fleet shows more gaps as a result, including on two ships that used to look clean — that is the rule as the brief writes it.
 - **The update gate earned its keep on day one (24 Oct, 04:40):** it refused `f0e54f6` because a refactor had deleted the neighbour-search query (`LIVE_NEAR_SQL`); the server stayed on the previous version and the app showed the failing test. Fixed, and `test_postgres_store_static` now checks on any machine, without a database, that every attribute PostgresStore uses exists and every statement gets as many parameters as it has placeholders.
 - **Live map on the recorded feed (24 Oct, 04:40):** with a real provider the app loads live ships per region from `/api/regions/{region}/vessels` (one joined query per region on the server, no per-ship lookups), refreshes every 3 minutes, and builds a ship's full analysis when it is opened; switching provider in the app drops the old source's data and reloads. The app no longer queries the server before sign-in (that left the admin controls hidden after the first sign-in). Recorded tracks are read straight from the live table, never copied into the paid-data cache. Verified end to end against a dev server fed simulated AIS for five Black Sea ships (sign-in, live list and map, vessel analysis, admin controls, reload, region switch; no JS errors).
 - **The first real install found four bugs, all fixed the same night:** the installer died generating secrets (`tr </dev/urandom | head` under `pipefail`, on every provider); Docker's buildx plugin was not installed; the server's web app opened the offline demo unless `?source=server` was added; migration 003 failed when re-applied after 004. The installer is now drilled end to end with faked system commands (fresh install, re-run, Docker-repository fallback) and every migration is run with stop-on-error against PostgreSQL 16 (fresh and upgraded databases, repeated passes).

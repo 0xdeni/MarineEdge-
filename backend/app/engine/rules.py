@@ -88,15 +88,21 @@ def rule_ais_gap(c: Ctx) -> list[Flag]:
     for i in range(1, len(c.track)):
         a, b = c.track[i - 1], c.track[i]
         dt = b.t - a.t
-        if dt < r.min_hours * H or c.in_port[i - 1] or c.in_port[i]:
+        # Only a gap that lies wholly inside one port stay is harmless. Going dark at sea and reappearing
+        # moored in a port (or the reverse) is exactly what this rule is for, so those count.
+        if dt < r.min_hours * H or (c.in_port[i - 1] and c.in_port[i]):
             continue
         zone, znm = c.ref.nearest_zone(a.lon, a.lat)
+        zone_b, znm_b = c.ref.nearest_zone(b.lon, b.lat)
         hours = dt / H
-        high = hours > r.high_hours or znm <= r.near_sensitive_nm
+        high = hours > r.high_hours or min(znm, znm_b) <= r.near_sensitive_nm
         severity, title = ("high" if high else "medium"), f"AIS gap of {round(hours)} hours"
+        back = f"Reappeared {round(nm_dist(a.lat, a.lon, b.lat, b.lon))} nm away"
+        if zone_b is not None and znm_b < znm:
+            back += f" · {'inside ' + zone_b.name if znm_b == 0 else f'{round(znm_b)} nm from {zone_b.name}'}"
         lines = [f"Off {fmt_dt(a.t)}, back on {fmt_dt(b.t)} UTC",
                  f"Last position {fmt_dm(a.lat, a.lon)} · {round(znm)} nm from {zone.name if zone else 'any sensitive zone'}",
-                 f"Reappeared {round(nm_dist(a.lat, a.lon, b.lat, b.lon))} nm away · {'satellite' if a.src == 'S' else 'terrestrial'} AIS before the gap"]
+                 f"{back} · {'satellite' if a.src == 'S' else 'terrestrial'} AIS before the gap"]
         if c.coverage is not None:
             cov = min(c.coverage(a.lon, a.lat), c.coverage(b.lon, b.lat))
             min_fixes = int(r.get("coverage_min_fixes", 50) or 0)
