@@ -1,6 +1,8 @@
-# Status — 23 Oct 2026 (late night)
+# Status — 24 Oct 2026
 
 Links: repo https://github.com/0xdeni/MarineEdge- · PWA prototype https://claude.ai/artifact/58pvuQYeUG1SCMQPxCPUBF · website canvas https://claude.ai/artifact/4oWLpjGRkTYuwPXWBpYgmi · owner checklist `docs/OWNER-CHECKLIST.md`
+
+**Live since 24 Oct 04:03 (São Paulo):** first server on an AWS Free-plan trial — t4g.small (2 Arm cores, 2 GB), Ubuntu 26.04, us-east-1, `https://44-197-249-76.sslip.io`. Installed from the owner's iPhone through EC2 Instance Connect; updates itself from GitHub every 10 minutes, each update gated by the full test suite plus migrations and the PostGIS store test on a scratch database. The trial ends six months after sign-up (late April 2027): an in-app export/import is the next engineering item.
 
 ## Where things stand against the brief's milestones
 
@@ -49,6 +51,8 @@ See `docs/OWNER-CHECKLIST.md`. Shortest version: create a server with the cloud-
 4. React port only on request.
 
 ## Known gaps
+
+- **The first real install found four bugs, all fixed the same night:** the installer died generating secrets (`tr </dev/urandom | head` under `pipefail`, on every provider); Docker's buildx plugin was not installed; the server's web app opened the offline demo unless `?source=server` was added; migration 003 failed when re-applied after 004. The installer is now drilled end to end with faked system commands (fresh install, re-run, Docker-repository fallback) and every migration is run with stop-on-error against PostgreSQL 16 (fresh and upgraded databases, repeated passes).
 
 - **Server: Oracle refused the owner's sign-up and Hetzner is paid, so the first server is an AWS Free-plan trial** (t4g.small, 2 GB, Arm; ~$18/month of credit, 6 months, cannot bill the card). The installer was made to fit it: swap on 1–2 GB machines, one API worker, memory-sized Postgres settings, Arm PostGIS image now actually written to `.env` (the 23 Oct Arm change computed it but never saved it — fixed). Before month 6 the data must move: an in-app export/import is next on the engineering list.
 - Oracle's Always Free tier was halved in June 2026 (now 2 OCPU / 12 GB); docs corrected.
