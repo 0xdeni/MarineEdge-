@@ -36,7 +36,7 @@ write_files:
       if [ -n "${GITHUB_TOKEN:-}" ]; then
         curl -fsSL -H "Authorization: token ${GITHUB_TOKEN}" "$URL" | bash
       else
-        curl -fsSL "$URL" | bash || echo "== could not fetch install.sh: if the repository is private, set GITHUB_TOKEN in /opt/marineedge-setup.env, or make it public" | tee -a /var/log/marineedge-install.log
+        curl -fsSL "$URL" | bash || echo "== install did not finish: see /var/log/marineedge-install.log (a private repository needs GITHUB_TOKEN)" | tee -a /var/log/marineedge-install.log
       fi
 package_update: true
 packages: [curl, git]
