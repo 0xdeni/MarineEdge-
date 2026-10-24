@@ -211,3 +211,27 @@ def test_live_prune_tiers():
     assert r["deleted"] == 1 and r["thinned"] == 26
     kept = sorted(st.live[1])
     assert len(kept) == 14 and len([t for t in kept if t < now - 30 * day]) == 4
+
+
+def test_live_region_is_one_query_and_local_tracks_are_not_recached():
+    """A region can hold thousands of ships: the listing must come from one joined query (no per-ship lookups).
+    Recorded tracks are read straight from the live table — never copied into the paid-data cache."""
+    from app.service import Service, stats_json
+    st = MemoryStore()
+    rec = Recorder(st, rules=RULES)
+    rec.handle(STATIC); rec.handle(POS); rec.flush()
+    pv = OwnAISProvider(st)
+    lookups = []
+    original = st.mmsi_by_imo
+    st.mmsi_by_imo = lambda imo: (lookups.append(imo), original(imo))[1]
+    area = pv.get_vessels_in_area((28.0, 40.0, 30.0, 42.0))
+    assert len(area) == 1 and lookups == []
+    v, p = area[0]
+    assert v.imo == 9100001 and v.type == "tanker" and v.flag == "Türkiye" and v.loa == 180 and v.speed == 0 and p.t == T_POS
+    assert pv.area_static[9100001].destination == "NOVOROSSIYSK"
+    st.mmsi_by_imo = original
+    svc = Service(provider=pv, store=st, ref=REF, rules=RULES, now_ms=T_POS + 3_600_000)
+    assert len(svc.track(9100001)) == 1 and st.latest_window_end(9100001) is None
+    region = svc.region((28.0, 40.0, 30.0, 42.0))
+    assert region[0]["destination"] == "NOVOROSSIYSK" and region[0]["flags"] is None and region[0]["vessel"]["imo"] == 9100001
+    assert stats_json({"port_calls": 3, "raw": 1, "history_since": 5}) == {"portCalls": 3, "raw": 1, "historySince": 5}

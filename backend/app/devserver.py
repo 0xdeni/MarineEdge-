@@ -54,6 +54,8 @@ class H(SimpleHTTPRequestHandler):
             if p == "/api/vessels/search":
                 return self._json([m.__dict__ for m in svc.search(q.get("q", [""])[0])])
             if p == "/api/fleet":
+                if not hasattr(svc.provider, "fleet"):        # same contract as app.main: demo fleet only
+                    return self._json({"detail": "fleet listing is only available with the mock provider"}, 404)
                 svc.provider.generate_all()
                 return self._json([analysis_json(svc.analysis(v.imo), include_track=False) for v in svc.provider.fleet])
             if p.startswith("/api/vessels/") and p.endswith("/crosscheck"):

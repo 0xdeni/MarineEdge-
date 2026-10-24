@@ -151,7 +151,9 @@ class MemoryStore:
             r = pts[max(pts)]
             if bbox[0] <= r["lon"] <= bbox[2] and bbox[1] <= r["lat"] <= bbox[3]:
                 m = self.mmsi.get(mmsi, {})
-                out.append({**r, "imo": m.get("imo") or r.get("imo"), "name": m.get("name") or r.get("name")})
+                out.append({**r, "imo": m.get("imo") or r.get("imo"), "name": m.get("name") or r.get("name"), "callsign": m.get("callsign"),
+                            "type_code": m.get("type_code"), "destination": m.get("destination"), "eta": m.get("eta"),
+                            "static_draught": m.get("draught"), "dim": m.get("dim")})
         return out
 
     def live_near(self, lat, lon, radius_m, t0, t1):
@@ -399,20 +401,15 @@ class PostgresStore:
         return self._live_row(r) if r else None
 
     def live_latest(self, bbox):
+        """Latest fix per ship in the box over the last 6 hours, with its static data — one query for a whole region."""
         with self._conn() as c:
-            rows = c.execute("""SELECT DISTINCT ON (a.mmsi) a.mmsi, a.ts, a.lat, a.lon, a.sog, a.cog, a.heading, a.nav, a.draught, COALESCE(a.imo, m.imo), m.name
+            rows = c.execute("""SELECT DISTINCT ON (a.mmsi) a.mmsi, a.ts, a.lat, a.lon, a.sog, a.cog, a.heading, a.nav, a.draught, COALESCE(a.imo, m.imo),
+                                       m.name, m.callsign, m.type_code, m.destination, m.eta, m.draught, m.dim_a, m.dim_b, m.dim_c, m.dim_d
                                 FROM ais_live a LEFT JOIN mmsi_map m ON m.mmsi = a.mmsi
                                 WHERE a.ts > now() - interval '6 hours' AND a.lon BETWEEN %s AND %s AND a.lat BETWEEN %s AND %s
                                 ORDER BY a.mmsi, a.ts DESC""", (bbox[0], bbox[2], bbox[1], bbox[3])).fetchall()
-        return [{**self._live_row(r[:10]), "name": r[10]} for r in rows]
-
-    LIVE_NEAR_SQL = """SELECT a.mmsi, COALESCE(a.imo, m.imo), m.name, min(a.ts), max(a.ts), avg(a.lat), avg(a.lon)
-        FROM ais_live a LEFT JOIN mmsi_map m ON m.mmsi = a.mmsi
-        WHERE a.ts BETWEEN %s AND %s
-          AND a.lat BETWEEN %s AND %s AND a.lon BETWEEN %s AND %s
-          AND 2 * 6371008.8 * asin(least(1, sqrt(power(sin(radians(a.lat - %s) / 2), 2)
-                + cos(radians(%s)) * cos(radians(a.lat)) * power(sin(radians(a.lon - %s) / 2), 2)))) <= %s
-        GROUP BY a.mmsi, COALESCE(a.imo, m.imo), m.name"""
+        return [{**self._live_row(r[:10]), "name": r[10], "callsign": r[11], "type_code": r[12], "destination": r[13],
+                 "eta": int(r[14].timestamp() * 1000) if r[14] else None, "static_draught": r[15], "dim": [r[16], r[17], r[18], r[19]]} for r in rows]
 
     def live_near(self, lat, lon, radius_m, t0, t1):
         """Ships within radius_m of a point during [t0, t1]: the primary key (ts, mmsi) narrows the time window,

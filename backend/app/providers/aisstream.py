@@ -102,11 +102,13 @@ class OwnAISProvider:
     name = "Recorded AIS (aisstream.io, own receivers feed)"
     credits_used = 0      # the Service logs last_credits per fetch; here every fetch is free
     last_credits = 0
+    local = True          # positions already live in our database: Service.track reads them directly, no cache copy
 
     def __init__(self, store):
         self.store = store
         self._cov: Optional[dict[tuple[int, int], int]] = None
         self._cov_at = 0.0
+        self.area_static: dict[int, LiveStatic] = {}     # filled by get_vessels_in_area for the region JSON
 
     # ---- adapter ----
     def search_vessel(self, query: str) -> list[VesselMatch]:
@@ -124,7 +126,7 @@ class OwnAISProvider:
         dim = r.get("dim") or [0, 0, 0, 0]
         v = Vessel(imo=imo, name=r.get("name") or str(imo), mmsi=str(r["mmsi"]), callsign=r.get("callsign") or "", flag=mid_flag(r["mmsi"]),
                    type=type_category(r.get("type_code")), sub=type_label(r.get("type_code")), loa=(dim[0] + dim[1]) or 0, beam=(dim[2] + dim[3]) or 0,
-                   draught_loaded=r.get("draught") or 0, region=region_of(self.store.live_last(imo)))
+                   draught_loaded=r.get("draught") or 0, region=region_of(self.store.live_last(imo)), speed=0)
         # MMSI history from the map: several MMSIs for one IMO means a reflag
         hist = [x for x in rows if x["mmsi"] != r["mmsi"]]
         for h in hist:
@@ -145,12 +147,23 @@ class OwnAISProvider:
         return out
 
     def get_vessels_in_area(self, bbox):
-        out = []
+        """Ships with an IMO and a fix in the last 6 hours, built straight from one joined query (a region can hold
+        thousands of ships; per-ship lookups would take minutes). Several MMSIs for one IMO: the newest fix wins."""
+        best: dict[int, dict] = {}
         for r in self.store.live_latest(bbox):
-            if not r.get("imo"):
-                continue
-            v = self.get_vessel(r["imo"]) or Vessel(imo=r["imo"], name=r.get("name") or str(r["imo"]), mmsi=str(r["mmsi"]))
-            out.append((v, Position(t=r["t"], lat=r["lat"], lon=r["lon"], sog=r.get("sog") or 0.0, cog=r.get("cog") or 0.0, draught=r.get("draught") or 0.0, nav=r.get("nav") or 0, src="T")))
+            imo = r.get("imo")
+            if imo and (imo not in best or r["t"] > best[imo]["t"]):
+                best[imo] = r
+        out, statics = [], {}
+        for imo, r in best.items():
+            dim = [d or 0 for d in (r.get("dim") or [0, 0, 0, 0])]
+            v = Vessel(imo=imo, name=r.get("name") or f"IMO {imo}", mmsi=str(r["mmsi"]), callsign=r.get("callsign") or "", flag=mid_flag(r["mmsi"]),
+                       type=type_category(r.get("type_code")), sub=type_label(r.get("type_code")), loa=(dim[0] + dim[1]) or 0, beam=(dim[2] + dim[3]) or 0,
+                       draught_loaded=r.get("static_draught") or 0, region=region_of(r), speed=0)
+            statics[imo] = LiveStatic(destination=r.get("destination") or "", eta=r.get("eta"), draught=r.get("static_draught"))
+            out.append((v, Position(t=r["t"], lat=r["lat"], lon=r["lon"], sog=r.get("sog") or 0.0, cog=r.get("cog") or 0.0,
+                                    draught=r.get("draught") or r.get("static_draught") or 0.0, nav=r.get("nav") or 0, src="T")))
+        self.area_static = statics
         return out
 
     def get_static(self, imo: int) -> LiveStatic:

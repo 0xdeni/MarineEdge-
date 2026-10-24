@@ -340,7 +340,8 @@ const EMPTY_ICON = {
   bell: '<svg viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg>',
 };
 function emptyState(icon, title, text, cta = '') { return `<div class="empty">${EMPTY_ICON[icon] || ''}<b>${title}</b><span>${text}</span>${cta}</div>`; }
-function sevBadge(a) { if (!a.flags.length) return `<span class="badge">0</span>`; return `<span class="badge ${a.sev.high ? 'high' : 'medium'}">${a.flags.length}${a.sev.high ? ' · ' + a.sev.high + 'H' : ''}</span>`; }
+function sevBadge(a) { if (a.light) return a.flagCount == null ? '<span class="badge" title="not analysed yet">…</span>' : a.flagCount ? `<span class="badge ${a.sev.high ? 'high' : 'medium'}">${a.flagCount}${a.sev.high ? ' · ' + a.sev.high + 'H' : ''}</span>` : '<span class="badge">0</span>';
+  if (!a.flags.length) return `<span class="badge">0</span>`; return `<span class="badge ${a.sev.high ? 'high' : 'medium'}">${a.flags.length}${a.sev.high ? ' · ' + a.sev.high + 'H' : ''}</span>`; }
 function watchlist() { return store.get('watch', []); }
 function watched(imo) { return watchlist().includes(imo); }
 function ago(t) { const m = Math.round((NOW - t) / 60e3); return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : m < 48 * 60 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} d ago`; }
@@ -369,8 +370,8 @@ function renderRegion() {
   const flagged = inView.filter(a => a.sev.high).length;
   return `<div class="sh"><div class="sh-title"><h2>${esc(REGIONS[S.region].label)}</h2><span class="count">${inView.length} in view · ${flagged} with high flags${S.loading ? ' · loading ' + LIVE.length + '/' + FLEET.length : ''}</span></div>
   <div class="filters">${TYPES.map(([k, l]) => `<button class="fchip" data-act="type" data-type="${k}" aria-pressed="${S.type === k}">${k !== 'all' ? `<span class="dot" style="--c:var(--t-${k})"></span>` : ''}${l}</button>`).join('')}<button class="fchip" data-act="flagged" aria-pressed="${S.flaggedOnly}">⚑ High flags only</button></div></div>
-  <ul class="rows">${shown.map(a => vesselRow(a)).join('') || `<li>${emptyState('radar', 'Nothing in view', 'Pan the chart or pick another region.')}</li>`}</ul>
-  <p class="hint">Sample fleet of ${FLEET.length} fictional vessels with generated 12-month tracks. Tap a ship on the chart or in the list to open its voyages, red flags and identity. Positions refresh from the AIS provider in the production build.</p>`;
+  <ul class="rows">${shown.slice(0, 150).map(a => vesselRow(a)).join('') || `<li>${S.live && !LIVE.length ? emptyState('radar', 'Waiting for live ships', 'Your server records ships as their AIS messages arrive, usually within minutes of saving the aisstream key. Profile › AIS provider › Recorded AIS shows the count.') : emptyState('radar', 'Nothing in view', 'Pan the chart or pick another region.')}</li>`}${shown.length > 150 ? `<li class="hint" style="padding:10px 4px">…and ${shown.length - 150} more in view. Zoom in or search by name, IMO or MMSI.</li>` : ''}</ul>
+  <p class="hint">${S.live ? `Live AIS recorded by your server: ${S.liveCount || 0} ships with a position in the last 6 hours in this region, updated ${S.liveAt ? new Date(S.liveAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}. Tap a ship to build its voyages and red flags from everything recorded so far.` : `Sample fleet of ${FLEET.length} fictional vessels with generated 12-month tracks. Tap a ship on the chart or in the list to open its voyages, red flags and identity. Positions refresh from the AIS provider in the production build.`}</p>`;
 }
 function renderSearch() {
   const res = API.server ? LIVE.filter(a => { const q = S.query.toUpperCase(); return a.v.name.includes(q) || String(a.v.imo).startsWith(q) || (a.v.mmsi || '').startsWith(q); }).map(a => a.v) : Provider.searchVessel(S.query); const dup = new Set(res.map(v => v.name).filter((n, i, arr) => arr.indexOf(n) !== i));
@@ -383,7 +384,7 @@ function vesselHeader(a) {
   const sanc = a.flags.find(f => f.rule === 'Sanctions hit'); const dark = a.voyages.reduce((s, x) => s + x.darkH, 0);
   return `<div class="backrow"><button class="ibtn" data-act="back">${ICON.chevL}${S.query ? 'Search' : esc(REGIONS[S.region].label)}</button><span class="mono muted" style="font-size:11px">fix ${ago(a.last.t)} · ${a.last.src === 'S' ? 'satellite' : 'terrestrial'}</span></div>
   <div class="vname"><h2>${esc(v.name)}${watched(v.imo) ? '<span class="star" title="Watching">★</span>' : ''}</h2><span class="ids">IMO ${v.imo} · MMSI ${v.mmsi} · ${v.callsign}</span></div>
-  <div class="vsub">${esc(v.sub)} · ${esc(v.flag)} flag${flagHist ? ` (${esc(flagHist.from)} until ${fmtMon(flagHist.t)})` : ''} · ${fmtN(v.dwt)} dwt · built ${v.built}</div>
+  <div class="vsub">${[esc(v.sub), `${esc(v.flag || 'Unknown')} flag${flagHist ? ` (${esc(flagHist.from)} until ${fmtMon(flagHist.t)})` : ''}`, v.dwt ? fmtN(v.dwt) + ' dwt' : '', v.built ? 'built ' + v.built : ''].filter(Boolean).join(' · ')}</div>
   <div class="status"><span class="led ${st.state}"></span><span>${statusLine(a)}${cur ? ` · draught ${a.last.draught} m` : ''}</span></div>
   <div class="kpis"><div class="kpi"><b>${a.voyages.length}</b><span>Voyages</span></div><div class="kpi ${a.sev.high ? 'high' : ''}"><b>${a.flags.length}</b><span>${a.sev.high ? a.sev.high + ' high' : 'Flags'}</span></div><div class="kpi ${sanc ? 'high' : 'ok'}"><b>${sanc ? 'Listed' : 'Clear'}</b><span>Sanctions</span></div><div class="kpi ${dark > 24 ? 'high' : ''}"><b>${Math.round(dark)} h</b><span>Time dark</span></div></div>
   <div class="actions"><button class="cap primary sm" data-act="report">Vessel report</button><button class="cap tint sm" data-act="watch" aria-pressed="${watched(v.imo)}">${watched(v.imo) ? '★ Watching' : '☆ Watch'}</button><button class="cap sm" data-act="fit">Fit voyages</button></div>`;
@@ -406,7 +407,7 @@ function renderVessel() {
     <div class="sec"><h3>Sanctions screening</h3><table class="kv">${lists}<tr><th>Screened</th><td>${fmtDT(NOW)} ${TZ()} · lists refreshed daily in production</td></tr></table></div>
     <div class="sec"><h3>Ownership and management</h3><table class="kv"><tr><th>Registered owner</th><td>${esc(v.regOwner)}</td></tr><tr><th>Beneficial owner</th><td>${esc(v.benOwner)}</td></tr><tr><th>ISM manager</th><td>${esc(v.ism)}</td></tr><tr><th>Commercial operator</th><td>${esc(v.operator)}</td></tr><tr><th>Class</th><td>${esc(v.classSoc)}</td></tr><tr><th>P&amp;I</th><td>${esc(v.pi)}</td></tr></table></div>`;
   } else {
-    body = `<table class="kv"><tr><th>Type</th><td>${esc(v.sub)}</td></tr><tr><th>Flag</th><td>${esc(v.flag)}</td></tr><tr><th>IMO</th><td class="mono">${v.imo}</td></tr><tr><th>MMSI</th><td class="mono">${v.mmsi}</td></tr><tr><th>Call sign</th><td class="mono">${v.callsign}</td></tr><tr><th>DWT / GT</th><td class="mono">${fmtN(v.dwt)} t / ${fmtN(v.gt)}</td></tr><tr><th>LOA × beam</th><td class="mono">${v.loa} m × ${v.beam} m</td></tr><tr><th>Draught loaded / ballast</th><td class="mono">${v.draughtLoaded} m / ${v.draughtBallast} m</td></tr><tr><th>Built</th><td>${v.built} · ${esc(v.builder)}</td></tr><tr><th>Service speed</th><td class="mono">${v.speed.toFixed(1)} kn</td></tr><tr><th>AIS destination</th><td class="mono">${esc(a.static.destination || '—')}</td></tr><tr><th>ETA (AIS)</th><td class="mono">${a.static.eta ? fmtDT(a.static.eta) + ' ' + TZ() : '—'}</td></tr><tr><th>Nav status</th><td>${a.last.nav === 0 ? 'Under way using engine' : a.last.nav === 1 ? 'At anchor' : 'Moored'}</td></tr><tr><th>Last position</th><td class="mono">${fmtDM(a.last.lat, a.last.lon)}<br>${fmtDT(a.last.t)} ${TZ()} · ${a.last.src === 'S' ? 'satellite' : 'terrestrial'}</td></tr><tr><th>Draught (AIS)</th><td class="mono">${a.last.draught} m</td></tr><tr><th>Region</th><td>${v.region === 'A' ? 'Black Sea / Eastern Mediterranean' : 'Gulf / Hormuz / Arabian Sea'}</td></tr></table>`;
+    body = `<table class="kv"><tr><th>Type</th><td>${esc(v.sub)}</td></tr><tr><th>Flag</th><td>${esc(v.flag)}</td></tr><tr><th>IMO</th><td class="mono">${v.imo}</td></tr><tr><th>MMSI</th><td class="mono">${v.mmsi}</td></tr><tr><th>Call sign</th><td class="mono">${v.callsign}</td></tr><tr><th>DWT / GT</th><td class="mono">${v.dwt ? fmtN(v.dwt) + ' t' : '—'} / ${v.gt ? fmtN(v.gt) : '—'}</td></tr><tr><th>LOA × beam</th><td class="mono">${v.loa ? v.loa + ' m' : '—'} × ${v.beam ? v.beam + ' m' : '—'}</td></tr><tr><th>Draught loaded / ballast</th><td class="mono">${v.draughtLoaded ? v.draughtLoaded + ' m' : '—'} / ${v.draughtBallast ? v.draughtBallast + ' m' : '—'}</td></tr><tr><th>Built</th><td>${v.built ? v.built + (v.builder ? ' · ' + esc(v.builder) : '') : '—'}</td></tr><tr><th>Service speed</th><td class="mono">${v.speed ? v.speed.toFixed(1) + ' kn' : '—'}</td></tr><tr><th>AIS destination</th><td class="mono">${esc(a.static.destination || '—')}</td></tr><tr><th>ETA (AIS)</th><td class="mono">${a.static.eta ? fmtDT(a.static.eta) + ' ' + TZ() : '—'}</td></tr><tr><th>Nav status</th><td>${a.last.nav === 0 ? 'Under way using engine' : a.last.nav === 1 ? 'At anchor' : 'Moored'}</td></tr><tr><th>Last position</th><td class="mono">${fmtDM(a.last.lat, a.last.lon)}<br>${fmtDT(a.last.t)} ${TZ()} · ${a.last.src === 'S' ? 'satellite' : 'terrestrial'}</td></tr><tr><th>Draught (AIS)</th><td class="mono">${a.last.draught} m</td></tr><tr><th>Region</th><td>${v.region === 'A' ? 'Black Sea / Eastern Mediterranean' : 'Gulf / Hormuz / Arabian Sea'}</td></tr></table>`;
   }
   const s = a.stats;
   return `<div class="vh">${vesselHeader(a)}<div class="tabs" role="tablist">${tabs.map(([k, l]) => `<button role="tab" data-act="vtab" data-tab="${k}" aria-selected="${S.vtab === k}">${l}</button>`).join('')}</div><div class="tab-body">${body}</div>
@@ -471,7 +472,7 @@ function focusFlag(f, scroll = true, snapTo = 'half') {
   if (scroll) { const el = document.getElementById('flag-' + f.id); if (el) el.scrollIntoView({ block: 'center', behavior: reduceMotion.matches ? 'auto' : 'smooth' }); }
 }
 function backToRegion() { S.mode = S.query ? 'search' : 'region'; S.voyage = null; S.focusFlag = null; renderSheet(); Chart.fitBounds(REGIONS[S.region].bounds); try { history.replaceState(null, '', '#' + S.region); } catch (e) {} }
-function setRegion(key) { S.region = key; syncRegions(); if (S.mode === 'vessel' || S.mode === 'voyage') { S.mode = 'region'; S.voyage = null; } S.query = ''; $('#q').value = ''; $('#qclear').hidden = true; if (S.mode === 'search') S.mode = 'region'; Chart.fitBounds(REGIONS[key].bounds); renderSheet(); try { history.replaceState(null, '', '#' + key); } catch (e) {} }
+function setRegion(key) { S.region = key; syncRegions(); if (S.mode === 'vessel' || S.mode === 'voyage') { S.mode = 'region'; S.voyage = null; } S.query = ''; $('#q').value = ''; $('#qclear').hidden = true; if (S.mode === 'search') S.mode = 'region'; Chart.fitBounds(REGIONS[key].bounds); renderSheet(); if (API.server && S.live) loadLive(key); try { history.replaceState(null, '', '#' + key); } catch (e) {} }
 function syncRegions() { document.querySelectorAll('#regions .rchip').forEach(c => c.setAttribute('aria-pressed', c.dataset.region === S.region)); }
 function toggleWatch(imo) { const w = watchlist(); const i = w.indexOf(imo); if (i >= 0) w.splice(i, 1); else w.push(imo); store.set('watch', w); toast(i >= 0 ? 'Removed from watchlist' : 'Added to watchlist'); if (API.server) API.putWatchlist(w).catch(() => toast('Watchlist not saved on the server')); }
 function providerLabel() { if (API.server) return 'Server · ' + (API.cfg.providerName || 'configured provider'); return { mock: 'Mock AIS provider (generated tracks)', kpler: 'Kpler / MarineTraffic API', spire: 'Kpler / Spire Maritime', datalastic: 'Datalastic', vesselfinder: 'VesselFinder API' }[SET.provider] || 'Mock AIS provider'; }
@@ -499,7 +500,7 @@ function renderVesselsPage() {
   let list = LIVE.slice(); if (S.vseg === 'watch') list = list.filter(a => watched(a.v.imo)); if (S.vseg === 'flagged') list = list.filter(a => a.sev.high);
   list.sort((x, y) => (y.sev.high - x.sev.high) || (y.flags.length - x.flags.length) || x.v.name.localeCompare(y.v.name));
   const empty = S.vseg === 'watch' ? emptyState('anchor', 'Nothing watched yet', 'Open a vessel and tap Watch; its new flags will show under Alerts.', '<button class="cta" data-act="vseg" data-seg="fleet">Browse the fleet →</button>') : emptyState('radar', 'Nothing here yet', 'No vessel matches this view.');
-  return `${topbar('Vessels')}<div class="content"><h1 class="largetitle">Vessels</h1><p class="sub">${LIVE.length} vessels in the sample fleet · ${LIVE.filter(a => a.sev.high).length} with high flags</p>
+  return `${topbar('Vessels')}<div class="content"><h1 class="largetitle">Vessels</h1><p class="sub">${LIVE.length} ${S.live ? 'live ships loaded' : 'vessels in the sample fleet'} · ${LIVE.filter(a => a.sev.high).length} with high flags</p>
   <div class="seg">${segs.map(([k, l]) => `<button data-act="vseg" data-seg="${k}" aria-pressed="${S.vseg === k}">${l}</button>`).join('')}</div>
   <div class="group"><ul class="rows">${list.map(a => vesselRow(a, ` · ${a.v.region === 'A' ? 'Black Sea' : 'Gulf'}`)).join('') || `<li>${empty}</li>`}</ul></div></div>`;
 }
@@ -602,8 +603,8 @@ function renderAdminProvider(back) {
 async function adminAction(act, b) {
   const key = () => ($('#admkey') ? $('#admkey').value.trim() : '');
   try {
-    if (act === 'adm-provider') { S.admKey = b.dataset.id; if (b.dataset.id === 'mock' || (S.admin && S.admin.keys && S.admin.keys[b.dataset.id])) { await API.adminProvider(b.dataset.id, key() || null); toast('Provider switched'); S.admin = null; } renderPage('profile'); }
-    else if (act === 'adm-savekey') { const p = S.admKey || (S.admin && S.admin.provider) || 'datalastic'; if (p !== 'mock' && !key()) { toast('Paste the key first'); return; } await API.adminProvider(p, key() || null); toast('Key saved on the server'); S.admin = null; renderPage('profile'); }
+    if (act === 'adm-provider') { S.admKey = b.dataset.id; if (b.dataset.id === 'mock' || (S.admin && S.admin.keys && S.admin.keys[b.dataset.id])) { await API.adminProvider(b.dataset.id, key() || null); toast('Provider switched'); S.admin = null; resetData(); } renderPage('profile'); }
+    else if (act === 'adm-savekey') { const p = S.admKey || (S.admin && S.admin.provider) || 'datalastic'; if (p !== 'mock' && !key()) { toast('Paste the key first'); return; } await API.adminProvider(p, key() || null); toast('Key saved on the server'); S.admin = null; resetData(); renderPage('profile'); }
     else if (act === 'adm-gfwkey') { const t = $('#gfwkey') ? $('#gfwkey').value.trim() : ''; if (!t) { toast('Paste the token first'); return; } await API.adminKey('gfw', t); toast('Cross-check token saved'); S.admin = null; renderPage('profile'); }
     else if (act === 'adm-test') { S.admTest = 'Testing…'; renderPage('profile'); const r = await API.adminTest(); S.admTest = r.ok ? `OK · ${r.provider} · ${r.matches} matches for “MAERSK” (${(r.sample || []).join(', ') || 'none'}) · ${r.credits_used} credits used · ${r.ms} ms` : `Failed: ${r.error}`; S.admin = null; renderPage('profile'); }
     else if (act === 'adm-firstpull') { const txt = ($('#fpimos') ? $('#fpimos').value : ''); const imos = (txt.match(/\d{7}/g) || []).slice(0, 10).map(Number); if (!imos.length) { toast('Type at least one 7-digit IMO'); return; } S.firstPull = { input: txt, running: true }; renderPage('profile'); const res = await API.adminFirstPull(imos); S.firstPull = { input: txt, results: res }; S.admin = null; renderPage('profile'); }
@@ -638,7 +639,7 @@ function renderLogin() {
   <button class="cap primary" type="submit">Sign in</button><button class="cap tint" type="button" data-act="passkey">Continue with a passkey</button>
   <div class="linkrow"><button type="button" data-act="forgot">Forgot password</button><button type="button" data-act="sso">Company SSO</button></div>
   <p style="font-size:12px">${API.server ? 'Enter the API token from your administrator. SSO replaces this on the company deployment.' : 'Demo sign-in: any email and password work. Production uses your identity provider; sessions never leave your server.'}</p></form>`;
-  el.querySelector('#loginForm').addEventListener('submit', e => { e.preventDefault(); const email = $('#lemail').value.trim() || 'analyst@example.com'; if (API.server) store.set('token', $('#lpass').value.trim()); signIn(email); if (API.server && !LIVE.length && !S.loading) loadFleet(() => { updateBadge(); renderSheet(); }); });
+  el.querySelector('#loginForm').addEventListener('submit', e => { e.preventDefault(); const email = $('#lemail').value.trim() || 'analyst@example.com'; if (API.server) store.set('token', $('#lpass').value.trim()); signIn(email); if (API.server) { S.loading = false; S.fetching = false; loadFleet(S.afterLoad || (() => { updateBadge(); renderSheet(); })); } });
   el.addEventListener('click', e => { const b = e.target.closest('[data-act]'); if (!b) return; if (b.dataset.act === 'passkey') signIn($('#lemail').value.trim() || 'analyst@example.com'); if (b.dataset.act === 'forgot') toast('Reset link would be emailed in production'); if (b.dataset.act === 'sso') toast('SSO redirect happens in production'); });
 }
 function signIn(email) {
@@ -767,10 +768,15 @@ function pageAction(act, b) {
 function loadFleet(done) {
   let i = 0; const loading = $('#loading');
   if (API.server) {
-    loading.hidden = false; loading.textContent = 'Loading fleet from server…';
-    API.me().then(me => { S.me = me; if (Array.isArray(me.watchlist)) store.set('watch', me.watchlist); S.push = me.push || {}; }).catch(() => {});
-    API.fleet().then(list => { for (const j of list) { const a = API.hydrate(j); ANALYSIS.set(a.v.imo, a); BY_IMO[a.v.imo] = a.v; const k = LIVE.findIndex(x => x.v.imo === a.v.imo); if (k >= 0) LIVE[k] = a; else LIVE.push(a); } loading.hidden = true; S.loading = false; if (S.page === 'chart') { Chart.draw(); renderSheet(); } done(); })
-      .catch(err => { loading.textContent = 'Server unavailable: ' + err.message; console.error(err); });
+    if (S.fetching) return; S.fetching = true;
+    loading.hidden = false; loading.textContent = 'Loading from your server…';
+    API.me().then(me => { S.me = me; if (Array.isArray(me.watchlist)) store.set('watch', me.watchlist); S.push = me.push || {}; if (S.page === 'profile') renderPage('profile'); }).catch(() => {});
+    API.fleet().then(list => { S.fetching = false; S.live = false; for (const j of list) { const a = API.hydrate(j); ANALYSIS.set(a.v.imo, a); BY_IMO[a.v.imo] = a.v; const k = LIVE.findIndex(x => x.v.imo === a.v.imo); if (k >= 0) LIVE[k] = a; else LIVE.push(a); } loading.hidden = true; S.loading = false; if (S.page === 'chart') { Chart.draw(); renderSheet(); } done(); })
+      .catch(err => {
+        S.fetching = false;
+        if (/^404 /.test(err.message)) { S.live = true; loadLive(S.region, done); return; }   // a real provider: no demo fleet, live ships instead
+        S.loading = false; loading.textContent = /Sign in/.test(err.message) ? 'Sign in to load your data' : 'Server unavailable: ' + err.message; console.error(err);
+      });
     return;
   }
   const step = () => {
@@ -782,6 +788,37 @@ function loadFleet(done) {
   };
   setTimeout(step, 0);
 }
+/* Live ships (real provider, e.g. the recorded aisstream feed): one light entry per ship from the region endpoint —
+   position, identity, AIS destination, flag counts once analysed. Opening a ship fetches its full 12-month analysis. */
+function lightEntry(j) {
+  const v = j.vessel; v.history = v.history || []; v.sanctions = v.sanctions || []; v.exNames = v.exNames || [];
+  const p = j.last, st = j.status;
+  const state = st ? st.state : (p.sog >= 0.5 ? 'underway' : p.nav === 1 ? 'anchored' : 'moored');
+  const dest = (st && st.destination) || j.destination || '';
+  return { v, track: [], portCalls: [], voyages: [], flags: [], light: true, flagCount: j.flags, sev: { high: j.high || 0, medium: 0, info: 0 }, last: p, stats: {},
+    static: { state, destination: dest || '—', eta: (st && st.eta) || j.eta || null, since: st ? st.since : p.t, port: (st && st.port) || { name: dest || 'reported position' }, lastPort: st && st.lastPort, nextPort: st && st.nextPort } };
+}
+function loadLive(region, done) {
+  const loading = $('#loading'); if (S.fetching) return; S.fetching = true;
+  if (!LIVE.length) { loading.hidden = false; loading.textContent = 'Loading live ships…'; }
+  API.region(region).then(list => {
+    for (const j of list) {
+      const imo = j.vessel.imo, cur = ANALYSIS.get(imo);
+      if (cur && !cur.light) { cur.last = j.last; continue; }           // analysed ship: keep the analysis, move the marker
+      const a = lightEntry(j); ANALYSIS.set(imo, a); BY_IMO[imo] = a.v;
+      const k = LIVE.findIndex(x => x.v.imo === imo); if (k >= 0) LIVE[k] = a; else LIVE.push(a);
+    }
+    S.fetching = false; S.loading = false; S.liveAt = Date.now(); S.liveCount = list.length; loading.hidden = true;
+    if (S.page === 'chart') { Chart.draw(); if (S.mode === 'region' || S.mode === 'search') renderSheet(); }
+    if (!S.liveTimer) S.liveTimer = setInterval(() => { if (S.live && document.visibilityState === 'visible' && !S.fetching) loadLive(S.region); }, 180000);
+    if (done) done();
+  }).catch(err => { S.fetching = false; S.loading = false; loading.hidden = false; loading.textContent = 'Live ships unavailable: ' + err.message; });
+}
+function resetData() {   // after a provider switch: drop what the old source produced, load from the new one
+  LIVE.length = 0; ANALYSIS.clear(); for (const k of Object.keys(BY_IMO)) delete BY_IMO[k];
+  S.imo = null; S.voyage = null; S.mode = 'region'; S.live = false; S.loading = false; S.fetching = false;
+  loadFleet(() => { updateBadge(); renderSheet(); });
+}
 function boot() {
   const savedRules = store.get('rules', null); if (savedRules) for (const k of Object.keys(savedRules)) if (RULES[k]) Object.assign(RULES[k], savedRules[k]);
   applyAppearance();
@@ -789,8 +826,11 @@ function boot() {
   const hash = (location.hash || '').slice(1); const m = hash.match(/^imo(\d{7})$/);
   if (REGIONS[hash]) S.region = hash; syncRegions();
   Chart.fitBounds(REGIONS[S.region].bounds, false); Sheet.snap('half'); renderSheet();
-  if (!store.get('auth', null)) renderLogin();
+  S.afterLoad = () => { updateBadge(); if (m && BY_IMO[+m[1]]) openVessel(+m[1]); else if (PAGES.includes(hash) && hash !== 'chart') showPage(hash); else renderSheet(); };
+  const needToken = API.server && !API.token();
+  if (!store.get('auth', null) || needToken) renderLogin();
   checkPush();
-  loadFleet(() => { updateBadge(); if (m && BY_IMO[+m[1]]) openVessel(+m[1]); else if (PAGES.includes(hash) && hash !== 'chart') showPage(hash); else renderSheet(); });
+  if (needToken) { $('#loading').hidden = true; return; }   // the sign-in form starts the load once the token is in
+  loadFleet(S.afterLoad);
 }
 boot();

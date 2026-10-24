@@ -126,6 +126,8 @@ class Service:
         (from the last fetched moment, with one hour of overlap, to now) is bought."""
         end = self._now()
         start = end - int(self.rules.history_months * 30.4 * 24 * 3_600_000)
+        if getattr(self.provider, "local", False):          # recorded feed: already in our database, nothing to buy or copy
+            return self.provider.get_track(imo, start, end)
         if self.store.covered(imo, start, end):
             return self.store.get_positions(imo, start, end)
         last = self.store.latest_window_end(imo)
@@ -169,11 +171,15 @@ class Service:
     def region(self, bbox: tuple[float, float, float, float]) -> list[dict]:
         self._sync()
         out = []
-        for v, p in self.provider.get_vessels_in_area(bbox):
+        rows = self.provider.get_vessels_in_area(bbox)
+        statics = getattr(self.provider, "area_static", {}) or {}
+        for v, p in rows:
             a = self._cache.get(v.imo)
+            st = statics.get(v.imo)
             out.append({"vessel": vessel_json(v), "last": pos_json(p),
                         "flags": len(a.flags) if a else None, "high": a.sev["high"] if a else None,
-                        "status": status_json(a) if a else None})
+                        "status": status_json(a) if a else None,
+                        **({"destination": st.destination, "eta": st.eta} if st else {})})
         return out
 
 
@@ -214,8 +220,14 @@ def status_json(a: Analysis) -> dict:
     return {"state": s.state, "destination": s.destination, "eta": s.eta, "since": s.since, "port": port(s.port), "lastPort": port(s.last_port), "nextPort": port(s.next_port)}
 
 
+def stats_json(stats: dict) -> dict:
+    """Pipeline stats with the key names core.js uses (portCalls, historySince)."""
+    ren = {"port_calls": "portCalls", "history_since": "historySince"}
+    return {ren.get(k, k): v for k, v in stats.items()}
+
+
 def analysis_json(a: Analysis, include_track: bool = True) -> dict[str, Any]:
     return {"vessel": vessel_json(a.vessel), "track": [pos_json(p) for p in a.track] if include_track else None,
             "portCalls": [port_call_json(pc) for pc in a.port_calls], "voyages": [voyage_json(v) for v in a.voyages],
-            "flags": [flag_json(f) for f in a.flags], "sev": a.sev, "status": status_json(a), "stats": a.stats,
+            "flags": [flag_json(f) for f in a.flags], "sev": a.sev, "status": status_json(a), "stats": stats_json(a.stats),
             "last": pos_json(a.track[-1]) if a.track else None}
