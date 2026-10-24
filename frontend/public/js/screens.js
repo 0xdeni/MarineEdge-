@@ -118,7 +118,16 @@ const Screens = {
     MapView.on('ship', (imo, name) => { if (!imo || imo === '0' || +imo === 0) { toast(`${name || 'This ship'} hasn't broadcast its IMO number yet.`); return; } App.go(`#/ship/${imo}`); });
     MapView.on('flag', key => { if (this.cur.imo) App.go(`#/ship/${this.cur.imo}/finding/${encodeURIComponent(key)}`); });
     MapView.on('voyage', n => { if (this.cur.imo && n != null) App.go(`#/ship/${this.cur.imo}/voyage/${n}`); });
-    window.addEventListener('resize', () => this.layoutAttr());
+    // Re-frame the region when the screen size settles (the keyboard closing after sign-in, rotation, iOS toolbars),
+    // unless the person has moved the map since the last framing.
+    if (MapView.map) MapView.map.on('movestart', e => { if (e && e.originalEvent) this.movedAt = Date.now(); });
+    const onResize = () => {
+      this.layoutAttr();
+      clearTimeout(this.refitT);
+      this.refitT = setTimeout(() => this.refitHome(), 180);
+    };
+    window.addEventListener('resize', onResize);
+    if (window.visualViewport) window.visualViewport.addEventListener('resize', onResize);
     this.renderRegionName();
     this.loadPorts();
   },
@@ -162,7 +171,11 @@ const Screens = {
   },
   fitRegion(animate) {
     const r = (S.regions || []).find(x => x.id === S.region) || REGION_VIEW[S.region] || REGION_VIEW.blacksea;
+    this.fitAt = Date.now();
     MapView.fit(r.bbox, { duration: animate ? 820 : 0, maxZoom: 8.6, padding: this.mapPad(this.home) });
+  },
+  refitHome() {
+    if (S.view === 'home' && !(this.movedAt > this.fitAt)) this.fitRegion(true);
   },
   renderRegionName() { $('#regionName').textContent = (S.regions.find(r => r.id === S.region) || {}).name || REGION_NAME[S.region] || 'Black Sea'; },
   dropMini() { if (this.mini) { try { this.mini.remove(); } catch (e) { /* gone */ } this.mini = null; } },
@@ -213,7 +226,11 @@ const Screens = {
       this.home.snap(this.home.pos && this.home.pos !== 'full' && prev.name !== 'search' ? this.home.pos : this.homeDetent === 'full' ? 'half' : this.homeDetent);
     }
     if (!S.overview || !$('#homeMain').innerHTML) this.renderHome();
-    if (this.firstHome) { this.firstHome = false; requestAnimationFrame(() => this.fitRegion(false)); }
+    if (this.firstHome) {
+      this.firstHome = false;
+      requestAnimationFrame(() => this.fitRegion(false));
+      setTimeout(() => this.refitHome(), 700);          // again once the sign-in keyboard and the welcome fade are gone
+    }
     else if (fromShip) this.fitRegion(true);
     this.renderLiveChip();
     this.layoutAttr();

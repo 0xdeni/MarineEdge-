@@ -8,7 +8,7 @@ from typing import Callable, Optional
 from .geo import fmt_dm, nm_dist
 from .refdata import RefData
 from .rules_config import Rules
-from .types import D, H, YEAR, Flag, PortCall, Position, Vessel
+from .types import H, YEAR, Flag, PortCall, Position, Vessel
 
 MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
@@ -51,12 +51,14 @@ class Ctx:
 
 # ---------------------------------------------------------------- rule 1: sanctions
 def rule_sanctions(c: Ctx) -> list[Flag]:
-    lookback = c.rules.sanctions.lookback_months * 30.4 * D
-    hits = [s for s in c.vessel.sanctions if s["t"] <= c.now and s["t"] >= c.now - lookback]
+    """A listing in force is a hit however long ago it began: store.list_sanctions returns only listings still
+    on the lists the server downloads, and `t` is the earliest date the server saw it there (or the listing date
+    when the source gives one). Ships removed from a list are not tracked yet (docs/STATUS.md, next steps)."""
+    hits = [s for s in c.vessel.sanctions if s["t"] <= c.now]
     if not hits:
         return []
     lists = " and ".join(h["list"] for h in hits)
-    lines = [f"{h['list']} · listed {fmt_dy(h['t'])} · {h['programme']}" for h in hits]
+    lines = [" · ".join(x for x in (h["list"], h.get("programme") or "", f"on the list since at least {fmt_dy(h['t'])}") if x) for h in hits]
     lines.append(f"Screened against {', '.join(c.rules.sanctions.lists)} lists")
     return [Flag(rule="Sanctions hit", severity="high", vessel_level=True, t0=hits[0]["t"],
                  title=f"IMO {c.vessel.imo} on {lists} list{'s' if len(hits) > 1 else ''}", lines=lines,

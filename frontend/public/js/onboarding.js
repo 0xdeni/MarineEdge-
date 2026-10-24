@@ -2,6 +2,9 @@
    sign in, create account (invite or server setup code), forgot password, reset, accept an invite. */
 'use strict';
 
+/* The welcome and account screens are always night: the browser's bars (theme-color) follow them, not the app theme. */
+function chromeColor(c) { const m = document.querySelector('meta[name=theme-color]'); if (m) m.content = c; }
+
 const Onboarding = {
   el: null, played: false, page: 0, current: null,
 
@@ -15,6 +18,7 @@ const Onboarding = {
       this.el.addEventListener('input', e => this.input(e));
     }
     this.el.hidden = false;
+    chromeColor('#000000');
     return this.el;
   },
 
@@ -53,6 +57,8 @@ const Onboarding = {
   close(fresh) {
     if (!this.el || this.el.hidden) return;
     const el = this.el;
+    const a = document.activeElement; if (a && el.contains(a)) a.blur();      // the keyboard goes before the fade, not after
+    chromeColor(document.documentElement.dataset.theme === 'light' ? '#F2F2F7' : '#000000');
     if (reduceMotion() || !fresh) { el.hidden = true; el.querySelector('.scr-host').innerHTML = ''; return; }
     el.style.transition = 'opacity 520ms var(--ease)'; el.style.opacity = '0';
     setTimeout(() => { el.hidden = true; el.style.transition = ''; el.style.opacity = ''; el.querySelector('.scr-host').innerHTML = ''; }, 540);
@@ -366,6 +372,7 @@ const Onboarding = {
     } catch (e) { /* handled */ }
   },
   async finish() {
+    const a = document.activeElement; if (a && a.blur) a.blur();
     const me = await API.me();
     await App.signedIn(me, { fresh: true });
   },

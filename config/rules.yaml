@@ -1,4 +1,6 @@
-# Every threshold the rule engine uses. Edit, restart the API (or POST /api/rules/reload), re-run.
+# Every threshold the rule engine uses: the defaults. An admin changes any number in the app (Profile ›
+# Red-flag rules); those changes are stored on the server's data volume and win over this file until
+# "Back to the defaults". docs/METHODOLOGY.md explains each rule.
 # Units: hours (h), nautical miles (nm), knots (kn), metres (m).
 
 port_call:
@@ -30,8 +32,8 @@ identity:
   medium_if_more_than: 1     # Info for one change, Medium for more
 
 sanctions:
-  lookback_months: 12
-  lists: [OFAC SDN, EU, UK]
+  lookback_months: 12        # reserved: how long a removal from a list will still count, once removals are tracked
+  lists: [OFAC SDN, EU, UK]  # a listing in force is a hit however long ago it began
 
 history_months: 12           # how much track to fetch and analyse
 

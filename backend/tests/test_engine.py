@@ -199,13 +199,19 @@ def test_identity_change_severity():
     assert "Identity change" not in rules_fired(run(tr, old))
 
 
-def test_sanctions_hit_within_lookback_only():
-    listed = vessel(sanctions=[{"list": "OFAC SDN", "programme": "RUSSIA-EO14024", "t": NOW - 100 * D}])
-    stale = vessel(sanctions=[{"list": "EU", "programme": "Reg. 833/2014", "t": NOW - 400 * D}])
+def test_sanctions_hit_for_every_listing_in_force_however_old():
+    # The lists hold only listings in force, so the listing date never ages a hit out: a ship first seen on the
+    # EU list 400 days ago and still there is as sanctioned as one listed last month.
+    recent = vessel(sanctions=[{"list": "OFAC SDN", "programme": "RUSSIA-EO14024", "t": NOW - 100 * D}])
+    old = vessel(sanctions=[{"list": "EU", "programme": "Reg. 833/2014", "t": NOW - 400 * D}])
+    future = vessel(sanctions=[{"list": "UK", "programme": "", "t": NOW + 3 * D}])
     tr = Track(T0, P["CND"].lat, P["CND"].lon).moor(24)
-    hit = [f for f in run(tr, listed).flags if f.rule == "Sanctions hit"]
+    hit = [f for f in run(tr, recent).flags if f.rule == "Sanctions hit"]
     assert len(hit) == 1 and hit[0].severity == "high" and hit[0].vessel_level
-    assert "Sanctions hit" not in rules_fired(run(tr, stale))
+    old_hit = [f for f in run(tr, old).flags if f.rule == "Sanctions hit"]
+    assert len(old_hit) == 1 and old_hit[0].severity == "high", old_hit
+    assert old_hit[0].lines[0].startswith("EU · Reg. 833/2014 · on the list since at least "), old_hit[0].lines
+    assert "Sanctions hit" not in rules_fired(run(tr, future))
 
 
 # ---------------------------------------------------------------- clean voyage

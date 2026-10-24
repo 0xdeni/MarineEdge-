@@ -1,5 +1,7 @@
-"""The provider adapter. Every AIS vendor is wrapped in these three calls, nothing else in the
-code base talks to a vendor. Swap the provider in .env (VVT_PROVIDER=mock|datalastic|kpler)."""
+"""The provider adapter. Every AIS vendor is wrapped in the six calls of AISProvider below; nothing else in
+the code base talks to a vendor. An admin picks the provider and pastes its key in the app (Profile › Data
+sources); VVT_PROVIDER in .env is only the starting value (aisstream | datalastic | kpler; mock only where
+VVT_ALLOW_MOCK=1, i.e. tests and `make dev`)."""
 from __future__ import annotations
 
 from dataclasses import dataclass

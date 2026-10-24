@@ -5,14 +5,15 @@ Sources (official downloads, all free):
              vessels carry 'Vessel Registration Identification IMO 1234567' in the remarks column.
   EU         https://webgate.ec.europa.eu/fsd/fsf/public/files/csvFullSanctionsList/content?token=dG9rZW4tMjAxNw
              semicolon CSV; vessel rows carry the IMO in the identification columns.
-  UK         https://assets.publishing.service.gov.uk/media/.../UK_Sanctions_List.csv  (link changes; see
-             https://www.gov.uk/government/publications/the-uk-sanctions-list). Rows carry "IMO number: 1234567".
+  UK         https://sanctionslist.fcdo.gov.uk/docs/UK-Sanctions-List.csv  (the FCDO's UK Sanctions List; a
+             different address can be set with UK_SANCTIONS_CSV_URL, or "off"). Rows carry "IMO number: 1234567".
   OpenSanctions maritime CSV (aggregated; CC BY-NC 4.0, commercial licence for business use):
              https://data.opensanctions.org/datasets/latest/maritime/  (file: maritime.csv)
 
 All parsers return the same row shape:
   {"list": "OFAC SDN"|"EU"|"UK"|"OpenSanctions", "imo": int, "name": str, "programme": str, "raw": any}
-Run daily: scripts/refresh_sanctions.py (cron inside the API container or on the host)."""
+Run daily by cron as `python -m app.jobs sanctions` inside the API container (deploy/cron.d-marineedge); an
+admin can also start it from the app (Profile › Sanctions lists › Download the lists now)."""
 from __future__ import annotations
 
 import csv

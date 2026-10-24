@@ -121,6 +121,16 @@ html { font-size: 17px; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; 
 @supports (font: -apple-system-body) { html { font: -apple-system-body; } }
 *, *::before, *::after { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); }
+/* iOS 26 Home Screen apps (viewport-fit=cover + black-translucent status bar) give a page that is shorter than the
+   screen a viewport that stops one status-bar height short of the bottom, so every fixed layer ends above a strip of
+   page background (WebKit bug 301108). A page at least as tall as the screen gets the whole screen; min() keeps it
+   from scrolling where the bug is fixed. */
+@media (display-mode: standalone) {
+  html { min-height: min(100lvh, calc(100% + env(safe-area-inset-top, 0px))); }
+}
+/* Should a strip still show, it takes the colour of what sits at the bottom: the sheet, or the night screens. */
+html { background: var(--sheet-solid); }
+html:has(#ob:not([hidden])), html:has(#ob:not([hidden])) body { background: #000; }
 body {
   font-family: var(--font); font-size: 1rem; line-height: 1.294; letter-spacing: -0.025em;
   -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; overflow: hidden; overscroll-behavior: none;

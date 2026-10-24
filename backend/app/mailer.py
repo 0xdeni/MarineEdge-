@@ -1,5 +1,5 @@
 """Outgoing email for password resets and invites. Plain SMTP from the standard library, configured by an
-admin in the app (Profile › Email delivery) and stored with the other runtime settings on the data volume.
+admin in the app (Profile › Email) and stored with the other runtime settings on the data volume.
 
 Any provider that speaks SMTP works: Resend, Postmark, Amazon SES, Mailgun, SendGrid, Brevo, or a Gmail /
 Google Workspace mailbox with an app password. Nothing is sent until an admin saves a host and a sender."""
