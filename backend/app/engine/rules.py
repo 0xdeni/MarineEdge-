@@ -59,7 +59,8 @@ def rule_sanctions(c: Ctx) -> list[Flag]:
     lines = [f"{h['list']} · listed {fmt_dy(h['t'])} · {h['programme']}" for h in hits]
     lines.append(f"Screened against {', '.join(c.rules.sanctions.lists)} lists")
     return [Flag(rule="Sanctions hit", severity="high", vessel_level=True, t0=hits[0]["t"],
-                 title=f"IMO {c.vessel.imo} on {lists} list{'s' if len(hits) > 1 else ''}", lines=lines)]
+                 title=f"IMO {c.vessel.imo} on {lists} list{'s' if len(hits) > 1 else ''}", lines=lines,
+                 meta={"lists": [h["list"] for h in hits]})]
 
 
 # ---------------------------------------------------------------- rule 2: sensitive port
@@ -77,7 +78,8 @@ def rule_sensitive_port(c: Ctx) -> list[Flag]:
                         title=f"{'Anchored' if pc.anchorage else 'Called'} at {pc.port.name}",
                         lines=[f"{z.name} · {z.basis}",
                                f"Arrived {fmt_dt(pc.arrive)}, departed {fmt_dt(pc.depart)} UTC · {fmt_dur(pc.depart - pc.arrive)}",
-                               f"Draught in {pc.draught_in} m · out {pc.draught_out} m"]))
+                               f"Draught in {pc.draught_in} m · out {pc.draught_out} m"],
+                        meta={"zone": z.short or z.name, "zone_id": z.id, "port": pc.port.name, "anchorage": pc.anchorage}))
     return out
 
 
@@ -111,8 +113,11 @@ def rule_ais_gap(c: Ctx) -> list[Flag]:
                 lines.append(f"Receiver coverage at the last position: {cov} fixes in 30 days (below {min_fixes}); terrestrial feeds do not see open sea. Not treated as a deliberate gap.")
             else:
                 lines.append(f"Receiver coverage at the last position: {cov} fixes in 30 days")
+        nz, nnm = (zone_b, znm_b) if (zone_b is not None and znm_b < znm) else (zone, znm)
         out.append(Flag(rule="AIS gap", severity=severity, t0=a.t, t1=b.t, lat=a.lat, lon=a.lon, hours=hours, title=title, lines=lines,
-                        evidence_before=c.track[max(0, i - 3):i], evidence_after=c.track[i:i + 3]))
+                        evidence_before=c.track[max(0, i - 3):i], evidence_after=c.track[i:i + 3],
+                        meta={"hours": round(hours, 1), "zone": (nz.short or nz.name) if nz else None, "zone_nm": round(nnm) if nz else None,
+                              "near": bool(nz is not None and nnm <= r.near_sensitive_nm), "coverage": severity == "info"}))
     return out
 
 
@@ -130,7 +135,8 @@ def rule_draught(c: Ctx) -> list[Flag]:
                         lines=[f"{fmt_dt(b.t)} UTC · {fmt_dm(b.lat, b.lon)} · {round(pnm)} nm from {port.name if port else 'nearest port'}",
                                f"Reported draught {a.draught} m → {b.draught} m with no port call in between",
                                "Draught is typed in by the crew: indicator, not proof"],
-                        evidence_before=c.track[max(0, i - 3):i], evidence_after=c.track[i:i + 3]))
+                        evidence_before=c.track[max(0, i - 3):i], evidence_after=c.track[i:i + 3],
+                        meta={"delta": round(d, 1), "from": a.draught, "to": b.draught}))
     return out
 
 
@@ -164,7 +170,8 @@ def rule_sts(c: Ctx) -> list[Flag]:
                                     lines=[f"{fmt_dt(t0)} – {fmt_dt(t1)} UTC · {fmt_dur(t1 - t0)} both under {r.max_speed_kn} kn, within {r.max_dist_m} m",
                                            f"{other.name} · IMO {other.imo} · {other.flag} · {other.sub}",
                                            f"{fmt_dm(mid.lat, mid.lon)} · {round(pnm)} nm from {port.name if port else 'nearest port'}, outside port limits"],
-                                    evidence_before=c.track[max(0, i - 2):i + 1], evidence_after=c.track[j:j + 3]))
+                                    evidence_before=c.track[max(0, i - 2):i + 1], evidence_after=c.track[j:j + 3],
+                                    meta={"partner": other.name, "partner_imo": other.imo, "hours": round((t1 - t0) / H, 1)}))
             i = j + 1
         else:
             i += 1
@@ -187,7 +194,8 @@ def rule_jump(c: Ctx) -> list[Flag]:
                                 title=f"Position jump, {round(kn)} knots",
                                 lines=[f"{fmt_dt(b.t)} UTC · fix at {fmt_dm(b.lat, b.lon)}, {round(nm_dist(a.lat, a.lon, b.lat, b.lon))} nm from the previous fix {round(dt * 60)} min earlier",
                                        f"Inside a known GPS jamming area ({jam['name']}) · possible GPS jamming" if jam else "Outside known jamming areas · check the receiver"],
-                                evidence_before=c.track[max(0, i - 2):i], evidence_after=c.track[i:i + 3]))
+                                evidence_before=c.track[max(0, i - 2):i], evidence_after=c.track[i:i + 3],
+                                meta={"kn": round(kn), "jamming": jam["name"] if jam else None}))
                 i += 1  # the return fix belongs to the same event
         i += 1
     return out
@@ -202,7 +210,8 @@ def rule_identity(c: Ctx) -> list[Flag]:
     sev = "medium" if len(ch) > c.rules.identity.medium_if_more_than else "info"
     return [Flag(rule="Identity change", severity=sev, vessel_level=True, t0=ch[0]["t"],
                  title=f"{len(ch)} identity change{'s' if len(ch) > 1 else ''} in 12 months",
-                 lines=[f"{fmt_dy(h['t'])} · {label.get(h['field'], h['field'])} {h['from']} → {h['to']}" for h in ch])]
+                 lines=[f"{fmt_dy(h['t'])} · {label.get(h['field'], h['field'])} {h['from']} → {h['to']}" for h in ch],
+                 meta={"changes": [{"field": h["field"], "from": h["from"], "to": h["to"], "t": h["t"]} for h in ch]})]
 
 
 RULES: list[tuple[str, Callable[[Ctx], list[Flag]]]] = [

@@ -3,7 +3,8 @@
   python -m app.jobs refresh      every 30 min: re-analyse every watched vessel (buys only the new
                                   tail of positions), turn new flags into alerts, push them
   python -m app.jobs sanctions    daily: refresh the sanctions lists (same as app.cli sanctions-refresh)
-  python -m app.jobs region       optional: warm the live region views (costs one area query per region)
+  python -m app.jobs region       optional: count ships in range per region
+  python -m app.jobs sweep        every 20 min: check ships in range that are unchecked or stale (recorded data, free)
   python -m app.jobs prune-live   daily: tiered retention for the recorded free feed (rules.live); --all for a full pass
 
 Everything goes through Service, so the cache rule and the provider adapter apply as in the API."""
@@ -73,14 +74,18 @@ def notify(svc: Service, alerts: list[dict]) -> int:
 
 def region(svc: Service | None = None) -> dict:
     svc = svc or Service()
-    from app.main import REGIONS
-    counts = {}
-    for k, bbox in REGIONS.items():
-        if k == "all":
-            continue
-        counts[k] = len(svc.region(bbox))
+    from app.service import REGIONS
+    counts = {k: len(svc.live_rows(r["bbox"])) for k, r in REGIONS.items()}
     log.info("region %s", json.dumps(counts))
     return counts
+
+
+def sweep(svc: Service | None = None, seconds: float = 240.0) -> dict:
+    """Check ships in range that were never checked or were checked more than 6 hours ago (recorded data, free)."""
+    svc = svc or Service()
+    out = svc.sweep(budget_s=seconds)
+    log.info("sweep %s", json.dumps(out))
+    return out
 
 
 def prune_live(full: bool = False) -> dict:
@@ -102,6 +107,8 @@ def main(argv: list[str]) -> int:
         print(json.dumps(refresh_all(os.environ["DATABASE_URL"], uk_csv_url=os.environ.get("UK_SANCTIONS_CSV_URL"), include_opensanctions=os.environ.get("OPENSANCTIONS", "") == "1")))
     elif cmd == "region":
         print(json.dumps(region()))
+    elif cmd == "sweep":
+        print(json.dumps(sweep()))
     elif cmd == "prune-live":
         print(json.dumps(prune_live(full=("--all" in argv))))
     else:

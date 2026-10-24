@@ -39,8 +39,46 @@ def save(d: dict[str, Any]) -> None:
     tmp.replace(FILE)
 
 
+def mock_allowed() -> bool:
+    """The generated demo fleet is for tests and local development only. A server never serves it unless
+    VVT_ALLOW_MOCK=1 is set on purpose, so the live app can't show invented ships."""
+    return os.environ.get("VVT_ALLOW_MOCK", "") == "1"
+
+
 def provider_name() -> str:
-    return load().get("provider") or os.environ.get("VVT_PROVIDER", "mock")
+    name = (load().get("provider") or os.environ.get("VVT_PROVIDER") or "aisstream").lower()
+    if name == "mock" and not mock_allowed():
+        return "aisstream"
+    return name
+
+
+def rule_overrides() -> dict[str, Any]:
+    """Thresholds changed in the app (Profile › Rules & thresholds), merged over config/rules.yaml."""
+    return dict(load().get("rules") or {})
+
+
+def set_rule_overrides(over: dict[str, Any]) -> None:
+    import time
+    d = load()
+    if over:
+        d["rules"] = over
+    else:
+        d.pop("rules", None)
+    d["updated"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    save(d)
+
+
+def zones_off() -> list[str]:
+    return list(load().get("zones_off") or [])
+
+
+def set_zone_enabled(zone_id: str, enabled: bool) -> list[str]:
+    d = load()
+    off = set(d.get("zones_off") or [])
+    (off.discard if enabled else off.add)(zone_id)
+    d["zones_off"] = sorted(off)
+    save(d)
+    return d["zones_off"]
 
 
 def provider_key(name: str) -> str:
@@ -77,7 +115,8 @@ def masked(key: str) -> str:
 
 def public_view() -> dict[str, Any]:
     d = load()
-    return {"provider": provider_name(), "keys": {k: masked(provider_key(k)) for k in KEY_ENV}, "file": str(FILE), "updated": d.get("updated")}
+    return {"provider": provider_name(), "keys": {k: masked(provider_key(k)) for k in KEY_ENV}, "updated": d.get("updated"),
+            "mockAllowed": mock_allowed()}
 
 
 def update_state() -> dict[str, Any] | None:

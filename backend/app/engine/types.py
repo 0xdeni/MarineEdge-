@@ -47,6 +47,7 @@ class Zone:
     basis: str
     poly: list[list[float]]   # [lon, lat] ring
     enabled: bool = True
+    short: str = ""           # how a sentence names it: "Crimea", "Iranian waters"
 
 
 @dataclass
@@ -133,6 +134,13 @@ class Flag:
     port_call: Optional[PortCall] = None
     voyage: Optional[Voyage] = None
     id: str = ""
+    meta: dict = field(default_factory=dict)   # structured facts behind the text (zone, port, partner, delta…) for the verdict
+
+    @property
+    def key(self) -> str:
+        """Stable across re-analysis (unlike id, which is positional): rule + start time. Notes attach to it."""
+        slug = "".join(ch for ch in self.rule.lower() if ch.isalnum())[:12]
+        return f"{slug}-{self.t0}"
 
 
 @dataclass
@@ -156,3 +164,4 @@ class Analysis:
     status: Status
     stats: dict
     sev: dict
+    verdict: dict = field(default_factory=dict)    # filled by app.verdict after the engine ran (not part of the pure pipeline)

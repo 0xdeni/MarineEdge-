@@ -232,6 +232,6 @@ def test_live_region_is_one_query_and_local_tracks_are_not_recached():
     st.mmsi_by_imo = original
     svc = Service(provider=pv, store=st, ref=REF, rules=RULES, now_ms=T_POS + 3_600_000)
     assert len(svc.track(9100001)) == 1 and st.latest_window_end(9100001) is None
-    region = svc.region((28.0, 40.0, 30.0, 42.0))
-    assert region[0]["destination"] == "NOVOROSSIYSK" and region[0]["flags"] is None and region[0]["vessel"]["imo"] == 9100001
+    region = svc.live_rows((28.0, 40.0, 30.0, 42.0))
+    assert region[0]["destination"] == "NOVOROSSIYSK" and region[0]["level"] is None and region[0]["imo"] == 9100001 and region[0]["checked"] is None
     assert stats_json({"port_calls": 3, "raw": 1, "history_since": 5}) == {"portCalls": 3, "raw": 1, "historySince": 5}

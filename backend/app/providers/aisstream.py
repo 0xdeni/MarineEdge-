@@ -112,11 +112,15 @@ class OwnAISProvider:
 
     # ---- adapter ----
     def search_vessel(self, query: str) -> list[VesselMatch]:
-        out = []
-        for r in self.store.live_search(query.strip())[:12]:
-            out.append(VesselMatch(imo=r["imo"] or 0, name=r.get("name") or str(r["mmsi"]), mmsi=str(r["mmsi"]), flag=mid_flag(r["mmsi"]),
-                                   type=type_category(r.get("type_code")), sub=type_label(r.get("type_code")), dwt=0, built=0))
-        return [m for m in out if m.imo]
+        out, seen = [], set()
+        for r in self.store.live_search(query.strip())[:24]:
+            if not r.get("imo") or r["imo"] in seen:
+                continue
+            seen.add(r["imo"])
+            out.append(VesselMatch(imo=r["imo"], name=r.get("name") or str(r["mmsi"]), mmsi=str(r["mmsi"]), flag=mid_flag(r["mmsi"]),
+                                   type=type_category(r.get("type_code")), sub=type_label(r.get("type_code")), dwt=0, built=0,
+                                   ex_names=[r["former"]] if r.get("former") else None))
+        return out[:12]
 
     def get_vessel(self, imo: int) -> Optional[Vessel]:
         rows = self.store.mmsi_by_imo(imo)
@@ -131,6 +135,15 @@ class OwnAISProvider:
         hist = [x for x in rows if x["mmsi"] != r["mmsi"]]
         for h in hist:
             v.history.append({"field": "mmsi", "from": str(h["mmsi"]), "to": str(r["mmsi"]), "t": r.get("updated_at") or int(time.time() * 1000)})
+        # names the ship has broadcast since we started recording: renames are identity changes, old names are ex-names
+        try:
+            names = self.store.names_for_imo(imo)
+        except Exception:  # noqa: BLE001  database before migration 005
+            names = []
+        for prev, cur in zip(names, names[1:]):
+            if prev["name"] != cur["name"]:
+                v.history.append({"field": "name", "from": prev["name"], "to": cur["name"], "t": cur["first_seen"]})
+        v.ex_names = [n["name"] for n in names if n["name"] != v.name]
         return v
 
     def get_track(self, imo: int, start_ms: int, end_ms: int) -> list[Position]:

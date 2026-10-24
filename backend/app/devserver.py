@@ -1,171 +1,128 @@
-"""Dependency-free dev server: serves the PWA and the same /api routes as app.main using only the
-standard library, so `python -m app.devserver` works on a laptop with nothing installed but PyYAML.
-Not for production (single-threaded, no auth). Use uvicorn app.main:app for the real API.
+"""Local development server, standard library only: serves the app (frontend/public), the map tiles file
+(/tiles/, with HTTP range requests) and every /api route through app.routes — the same handlers the
+production FastAPI app uses. Single machine, no TLS; not for production.
 
-  cd backend && VVT_PROVIDER=mock python -m app.devserver            # http://127.0.0.1:8080/?source=server
-"""
+  cd backend && python -m app.devserver            # http://127.0.0.1:8080
+  VVT_PROVIDER=aisstream python -m app.devserver   # the recorded-feed path instead of the demo fleet
+
+Without VVT_PROVIDER the dev server uses the generated demo fleet so the screens have ships to show;
+a real server never does (settings_store.mock_allowed)."""
 from __future__ import annotations
 
-import json
 import os
 import sys
-from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qsl, urlparse
 
-from app.service import Service, analysis_json, vessel_json
+if not os.environ.get("VVT_PROVIDER"):
+    os.environ["VVT_PROVIDER"] = "mock"
+if os.environ["VVT_PROVIDER"] == "mock":
+    os.environ.setdefault("VVT_ALLOW_MOCK", "1")
+
+from app import routes  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 WEB = ROOT / "frontend" / "public"
-REGIONS = {"blacksea": (27.2, 40.6, 42.0, 47.4), "hormuz": (55.3, 25.3, 57.7, 27.5), "iran": (48.0, 24.4, 61.8, 31.0), "oman": (52.8, 16.0, 62.6, 26.9), "uae": (51.3, 23.6, 57.3, 26.6), "all": (-180, -90, 180, 90)}
-svc = Service()
-USER = "dev"
+
+
+def tiles_dir() -> Path:
+    from app import settings_store
+    return Path(os.environ.get("VVT_TILES_DIR") or (Path(settings_store.DATA_DIR) / "maps"))
 
 
 class H(SimpleHTTPRequestHandler):
+    protocol_version = "HTTP/1.1"
+
     def __init__(self, *a, **kw):
         super().__init__(*a, directory=str(WEB), **kw)
 
-    def log_message(self, fmt, *args):  # quieter
-        if "/api/" in (args[0] if args else ""):
+    def log_message(self, fmt, *args):  # quieter: API calls only
+        if args and "/api/" in str(args[0]):
             super().log_message(fmt, *args)
 
-    def _json(self, obj, status=200):
-        body = json.dumps(obj).encode()
-        self.send_response(status)
-        self.send_header("Content-Type", "application/json")
-        self.send_header("Content-Length", str(len(body)))
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.end_headers()
-        self.wfile.write(body)
+    def end_headers(self):
+        if not self.path.startswith("/api/"):
+            self.send_header("Cache-Control", "no-cache")
+        super().end_headers()
 
-    def _body(self):
+    def _api(self):
+        u = urlparse(self.path)
         n = int(self.headers.get("Content-Length") or 0)
-        return json.loads(self.rfile.read(n) or b"{}") if n else {}
+        body = self.rfile.read(n) if n else b""
+        req = routes.Request(method=self.command, path=u.path, query=dict(parse_qsl(u.query)),
+                             headers={k.lower(): v for k, v in self.headers.items()}, body=body, client_ip=self.client_address[0])
+        res = routes.dispatch(req)
+        data = res.encoded() if res.status != 204 else b""
+        self.send_response(res.status)
+        if res.status != 204:
+            self.send_header("Content-Type", res.content_type)
+        self.send_header("Content-Length", str(len(data)))
+        for k, v in res.headers:
+            self.send_header(k, v)
+        self.end_headers()
+        if data and self.command != "HEAD":
+            self.wfile.write(data)
+
+    def _tiles(self):
+        name = urlparse(self.path).path.split("/tiles/", 1)[1]
+        f = tiles_dir() / Path(name).name
+        if not f.is_file():
+            self.send_error(404)
+            return
+        size = f.stat().st_size
+        rng = self.headers.get("Range", "")
+        start, end = 0, size - 1
+        status = 200
+        if rng.startswith("bytes="):
+            a, _, b = rng[6:].partition("-")
+            start = int(a) if a else max(0, size - int(b))
+            end = min(size - 1, int(b)) if (a and b) else size - 1
+            if start >= size:
+                self.send_response(416)
+                self.send_header("Content-Range", f"bytes */{size}")
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+                return
+            status = 206
+        with open(f, "rb") as fh:
+            fh.seek(start)
+            data = fh.read(end - start + 1)
+        self.send_response(status)
+        self.send_header("Content-Type", "application/octet-stream")
+        self.send_header("Accept-Ranges", "bytes")
+        if status == 206:
+            self.send_header("Content-Range", f"bytes {start}-{end}/{size}")
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
 
     def do_GET(self):
-        u = urlparse(self.path)
-        p = u.path
-        q = parse_qs(u.query)
-        try:
-            if p == "/api/health":
-                return self._json({"ok": True, "provider": getattr(svc.provider, "name", "?"), "auth": "open", "dev": True})
-            if p == "/api/vessels/search":
-                return self._json([m.__dict__ for m in svc.search(q.get("q", [""])[0])])
-            if p == "/api/fleet":
-                if not hasattr(svc.provider, "fleet"):        # same contract as app.main: demo fleet only
-                    return self._json({"detail": "fleet listing is only available with the mock provider"}, 404)
-                svc.provider.generate_all()
-                return self._json([analysis_json(svc.analysis(v.imo), include_track=False) for v in svc.provider.fleet])
-            if p.startswith("/api/vessels/") and p.endswith("/crosscheck"):
-                from app import settings_store
-                from app.engine.types import YEAR
-                from app.providers.gfw import GFWClient
-                tok = settings_store.provider_key("gfw")
-                if not tok:
-                    return self._json({"ok": False, "source": "Global Fishing Watch", "error": "no Global Fishing Watch token yet — Profile › AIS provider › Cross-check token"})
-                now = svc._now()
-                return self._json(GFWClient(tok).crosscheck(int(p.split("/")[3]), now - YEAR, now))
-            if p.startswith("/api/vessels/") and p.endswith("/analysis"):
-                imo = int(p.split("/")[3])
-                return self._json(analysis_json(svc.analysis(imo), include_track=q.get("track", ["1"])[0] != "0"))
-            if p.startswith("/api/vessels/"):
-                v = svc.provider.get_vessel(int(p.split("/")[3]))
-                return self._json(vessel_json(v)) if v else self._json({"error": "unknown IMO"}, 404)
-            if p.startswith("/api/regions/"):
-                return self._json(svc.region(REGIONS[p.split("/")[3]]))
-            if p == "/api/rules":
-                return self._json(dict(svc.rules))
-            if p == "/api/me":
-                return self._json({"user": USER, "role": "admin", "watchlist": svc.store.get_watchlist(USER), "push": {"configured": False, "publicKey": ""}, "provider": getattr(svc.provider, "name", "?")})
-            if p == "/api/admin/config":
-                from app import settings_store
-                return self._json({**settings_store.public_view(), "active": getattr(svc.provider, "name", "?"), "credits_used": getattr(svc.provider, "credits_used", 0), "fetches_this_run": svc.fetches, "live": svc.store.live_stats(), "update": settings_store.update_state(), "disk": settings_store.disk_view(), "db_gb": None, "database": False, "push": False, "auth": "open"})
-            if p.startswith("/api/me/notes/"):
-                return self._json(svc.store.get_notes(USER, int(p.split("/")[4])))
-            if p == "/api/alerts":
-                return self._json(svc.store.list_alerts(svc._now() - int(q.get("days", ["14"])[0]) * 86_400_000))
-            if p.startswith("/api/"):
-                return self._json({"error": "not found"}, 404)
-        except KeyError:
-            return self._json({"error": "unknown"}, 404)
-        if p == "/":
+        if self.path.startswith("/api/"):
+            return self._api()
+        if self.path.startswith("/tiles/"):
+            return self._tiles()
+        if urlparse(self.path).path == "/":
             self.path = "/index.html"
         return super().do_GET()
 
-    def do_PUT(self):
-        p = urlparse(self.path).path
-        body = self._body()
-        if p == "/api/me/watchlist":
-            svc.store.set_watchlist(USER, body.get("imos", []))
-            return self._json({"watchlist": svc.store.get_watchlist(USER)})
-        if p.startswith("/api/me/notes/"):
-            _, _, _, _, imo, n = p.split("/")
-            svc.store.set_note(USER, int(imo), int(n), body.get("text", ""))
-            return self._json(svc.store.get_notes(USER, int(imo)))
-        return self._json({"error": "not found"}, 404)
-
     def do_POST(self):
-        p = urlparse(self.path).path
-        body = self._body()
-        if p.startswith("/api/vessels/") and p.endswith("/report"):
-            from app.reports.render import render_html
-            html = render_html(svc.analysis(int(p.split("/")[3]))).encode()
-            self.send_response(200)
-            self.send_header("Content-Type", "text/html; charset=utf-8")
-            self.send_header("Content-Length", str(len(html)))
-            self.end_headers()
-            return self.wfile.write(html)
-        if p == "/api/push/subscribe":
-            svc.store.add_push_subscription(USER, body, self.headers.get("User-Agent", ""))
-            return self._json({"ok": True, "configured": False})
-        if p == "/api/jobs/refresh":
-            from app.jobs import refresh
-            return self._json(refresh(svc))
-        if p == "/api/admin/provider":
-            try:
-                return self._json(svc.set_provider(body.get("provider", "mock"), body.get("api_key")))
-            except Exception as e:  # noqa: BLE001
-                return self._json({"error": str(e)[:300]}, 400)
-        if p == "/api/admin/test":
-            try:
-                return self._json(svc.test_provider())
-            except Exception as e:  # noqa: BLE001
-                return self._json({"ok": False, "error": str(e)[:300]})
-        if p == "/api/admin/key":
-            from app import settings_store
-            if body.get("name") not in settings_store.KEY_ENV:
-                return self._json({"error": "unknown key name"}, 400)
-            settings_store.set_key(body["name"], body.get("api_key"))
-            return self._json(settings_store.public_view())
-        if p == "/api/admin/first-pull":
-            return self._json(svc.first_pull([int(i) for i in body.get("imos", [])][:10]))
-        if p == "/api/jobs/sanctions":
-            return self._json({"error": "sanctions refresh needs DATABASE_URL (PostGIS)"}, 400)
-        if p == "/api/rules/reload":
-            return self._json(dict(svc.reload_rules()))
-        return self._json({"error": "not found"}, 404)
+        return self._api()
+
+    def do_PUT(self):
+        return self._api()
+
+    def do_PATCH(self):
+        return self._api()
 
     def do_DELETE(self):
-        p = urlparse(self.path).path
-        body = self._body()
-        if p == "/api/push/subscribe":
-            svc.store.remove_push_subscription(body.get("endpoint", ""))
-            return self._json({"ok": True})
-        return self._json({"error": "not found"}, 404)
-
-    def do_OPTIONS(self):
-        self.send_response(HTTPStatus.NO_CONTENT)
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "GET,PUT,POST,DELETE,OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type,Authorization")
-        self.end_headers()
+        return self._api()
 
 
 def main():
     port = int(os.environ.get("PORT", sys.argv[1] if len(sys.argv) > 1 else 8080))
-    print(f"MarineEdge dev server on http://127.0.0.1:{port}/?source=server  (provider: {getattr(svc.provider, 'name', '?')})")
+    s = routes.app_state().svc
+    print(f"MarineEdge dev server on http://127.0.0.1:{port}  (data: {getattr(s.provider, 'name', '?')}{', DEMO FLEET' if s.is_mock else ''})", flush=True)
     ThreadingHTTPServer(("127.0.0.1", port), H).serve_forever()
 
 

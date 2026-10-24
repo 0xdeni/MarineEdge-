@@ -63,9 +63,9 @@ def cmd_report(a):
 
 def cmd_region(a):
     svc = _svc()
-    for row in svc.region(REGIONS[a.region]):
-        v, p = row["vessel"], row["last"]
-        print(f"{v['imo']}  {v['name']:<22} {p['sog']:>5} kn  {p['lat']:.3f},{p['lon']:.3f}")
+    from app.service import REGIONS as REG
+    for r in svc.live_rows(REG[a.region]["bbox"]):
+        print(f"{r['imo']}  {r['name']:<22} {r['sog']:>5} kn  {r['lat']:.3f},{r['lon']:.3f}  {r['level'] or 'not checked'}")
 
 
 def cmd_fleet(a):

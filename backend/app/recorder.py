@@ -153,6 +153,11 @@ class Recorder:
             merged = {**prev, **{k: v for k, v in row.items() if v is not None}, "updated_at": row["t"]}
             self.static[row["mmsi"]] = merged
             self.store.mmsi_upsert(merged)
+            if row.get("name") and row["name"] != prev.get("name"):
+                try:          # a new or changed broadcast name: kept so former names stay searchable
+                    self.store.name_seen(row["mmsi"], prev.get("name"), row["name"], row["t"])
+                except Exception:  # noqa: BLE001  older database without migration 005
+                    log.debug("name_seen failed", exc_info=True)
             if merged.get("imo"):
                 self.store.live_backfill_imo(row["mmsi"], merged["imo"])
             return

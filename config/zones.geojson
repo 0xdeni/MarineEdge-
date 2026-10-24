@@ -7,7 +7,8 @@
     "id": "crimea",
     "name": "Crimea (sanctioned ports)",
     "basis": "EU/UK/US sanctions",
-    "enabled": true
+    "enabled": true,
+    "short": "Crimea"
    },
    "geometry": {
     "type": "Polygon",
@@ -79,7 +80,8 @@
     "id": "azov",
     "name": "Occupied Azov coast",
     "basis": "EU/UK/US sanctions",
-    "enabled": true
+    "enabled": true,
+    "short": "the occupied Azov coast"
    },
    "geometry": {
     "type": "Polygon",
@@ -123,7 +125,8 @@
     "id": "syria",
     "name": "Syria",
     "basis": "OFAC/EU sanctions programmes",
-    "enabled": true
+    "enabled": true,
+    "short": "Syria"
    },
    "geometry": {
     "type": "Polygon",
@@ -171,7 +174,8 @@
     "id": "iran",
     "name": "Iran coastal waters",
     "basis": "OFAC/EU/UK sanctions programmes",
-    "enabled": true
+    "enabled": true,
+    "short": "Iranian waters"
    },
    "geometry": {
     "type": "Polygon",
@@ -331,7 +335,8 @@
     "id": "dprk",
     "name": "North Korea coastal waters",
     "basis": "UN/OFAC/EU/UK sanctions programmes",
-    "enabled": true
+    "enabled": true,
+    "short": "North Korean waters"
    },
    "geometry": {
     "type": "Polygon",

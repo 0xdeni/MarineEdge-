@@ -1,26 +1,24 @@
-"""API access control. Two modes, chosen by environment:
+"""Who is calling. Two kinds of caller:
 
-  API_TOKENS unset   → open (local dev only; the frontend's demo login is cosmetic)
-  API_TOKENS set     → every /api/* route except /api/health needs `Authorization: Bearer <token>`
-                       or `X-API-Key: <token>`. Comma-separated `name:token` pairs, e.g.
-                       API_TOKENS="deni:9f3a...,analyst2:77c1..."; the name is logged, never the token.
+  * people, signed in with an account (app/accounts.py): an HttpOnly session cookie `me_session`
+    (or the same value as a Bearer token from a script)
+  * scripts and scheduled jobs, with an API token from .env:
+      API_TOKENS="admin:9f3a…:admin,etl:77c1…"   → `Authorization: Bearer <token>` or `X-API-Key: <token>`
+    The name is logged, never the token. The admin token is also the setup code for the first account.
 
-SSO (Google Workspace / Microsoft Entra) goes in front of this on deploy: Caddy or oauth2-proxy
-authenticates the browser and forwards an identity header; see docs/DEPLOY.md. Tokens stay for the
-CLI, scheduled jobs and the PWA on a phone."""
+There is no anonymous mode: every /api route except health and the sign-in endpoints needs one of the two."""
 from __future__ import annotations
 
 import hmac
 import logging
 import os
+from dataclasses import dataclass
 from typing import Optional
-
-from fastapi import HTTPException, Request
 
 log = logging.getLogger("marineedge.auth")
 
-
-ROLES: dict[str, str] = {}   # name -> role, filled by _tokens()
+COOKIE = "me_session"
+ROLES: dict[str, str] = {}   # token name -> role, filled by _tokens()
 
 
 def _tokens() -> dict[str, str]:
@@ -35,52 +33,60 @@ def _tokens() -> dict[str, str]:
         if len(bits) >= 2:
             name, tok = bits[0].strip(), bits[1].strip()
             ROLES[name] = bits[2].strip().lower() if len(bits) > 2 and bits[2].strip() else "analyst"
-            out[tok] = name
+            if tok:
+                out[tok] = name
         else:
             out[bits[0]] = "token"
             ROLES["token"] = "analyst"
     return out
 
 
-def role_of(name: str) -> str:
-    if name in ("open", "health"):
-        return "admin"            # no tokens configured: dev mode, everything allowed
-    return ROLES.get(name, "analyst")
-
-
-def enabled() -> bool:
+def tokens_configured() -> bool:
     return bool(_tokens())
 
 
-def identify(request: Request) -> Optional[str]:
-    """Returns the caller's name, or None when no valid token is presented."""
-    toks = _tokens()
-    if not toks:
-        return "open"
-    cand = ""
-    auth = request.headers.get("authorization", "")
-    if auth.lower().startswith("bearer "):
-        cand = auth[7:].strip()
-    cand = cand or request.headers.get("x-api-key", "").strip()
-    for tok, name in toks.items():
-        if cand and hmac.compare_digest(cand, tok):
+def token_name(candidate: str) -> Optional[str]:
+    for tok, name in _tokens().items():
+        if candidate and hmac.compare_digest(candidate, tok):
             return name
     return None
 
 
-async def require_token(request: Request) -> str:
-    """FastAPI dependency. Health stays open so load balancers and uptime checks work."""
-    if request.url.path.rstrip("/") == "/api/health":
-        return "health"
-    who = identify(request)
-    if who is None:
-        raise HTTPException(status_code=401, detail="missing or invalid API token", headers={"WWW-Authenticate": "Bearer"})
-    request.state.user = who
-    return who
+@dataclass
+class Principal:
+    kind: str                       # "session" (a person) | "token" (a script)
+    key: str                        # key for per-user state: the account email, or the token name
+    role: str                       # admin | analyst
+    user: Optional[dict] = None     # the account row for people
+    session_id: Optional[int] = None
+
+    @property
+    def is_admin(self) -> bool:
+        return self.role == "admin"
 
 
-async def require_admin(request: Request) -> str:
-    who = getattr(request.state, "user", None) or identify(request) or "open"
-    if role_of(who) != "admin":
-        raise HTTPException(status_code=403, detail="admin token required")
-    return who
+def bearer(headers: dict[str, str]) -> str:
+    auth = headers.get("authorization", "")
+    if auth.lower().startswith("bearer "):
+        return auth[7:].strip()
+    return headers.get("x-api-key", "").strip()
+
+
+def resolve(headers: dict[str, str], cookies: dict[str, str], accounts) -> Optional[Principal]:
+    b = bearer(headers)
+    if b:
+        name = token_name(b)
+        if name:
+            return Principal(kind="token", key=name, role=ROLES.get(name, "analyst"))
+        hit = accounts.session_user(b)
+        if hit:
+            u, sid = hit
+            return Principal(kind="bearer-session", key=u["email"], role=u.get("role") or "analyst", user=u, session_id=sid)
+        return None
+    c = cookies.get(COOKIE)
+    if c:
+        hit = accounts.session_user(c)
+        if hit:
+            u, sid = hit
+            return Principal(kind="session", key=u["email"], role=u.get("role") or "analyst", user=u, session_id=sid)
+    return None
