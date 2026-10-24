@@ -133,7 +133,7 @@ def _categories(a: Analysis) -> list[_Cat]:
             core = f"went dark {times(n)}, {hours_text(sum(f.hours for f in hi))} in all{where}"
         out.append(_Cat("gaps", "high", _cap(core) + ".", core, (f"{round(total_h)} h", "with AIS off")))
 
-    dr = by.get("Draught change at sea", [])
+    dr = [f for f in by.get("Draught change at sea", []) if f.severity == "high"]
     if dr:
         n = len(dr)
         if n == 1:
@@ -239,10 +239,12 @@ def build(a: Analysis, sanctions_checked: bool = True, lists: Optional[list[str]
             "historyDays": round(days, 1), "historyFrom": a.track[0].t if a.track else None, "findings": n_findings, "headline": headline}
 
 
-def risk_row(a: Analysis, v: dict[str, Any]) -> dict[str, Any]:
-    """What the region overview needs about a ship, stored after every analysis."""
+def risk_row(a: Analysis, v: dict[str, Any], engine: Optional[str] = None) -> dict[str, Any]:
+    """What the region overview needs about a ship, stored after every analysis. `engine` marks the rules that wrote it
+    (Service.engine_stamp): rows written under other rules are treated as not checked and re-checked by the sweep."""
     return {"name": a.vessel.name, "level": v["level"], "high": a.sev.get("high", 0), "medium": a.sev.get("medium", 0), "info": a.sev.get("info", 0),
-            "headline": v.get("headline"), "sentence": v["sentence"], "sanctioned": bool(a.vessel.sanctions), "history_days": v["historyDays"]}
+            "headline": v.get("headline"), "sentence": v["sentence"], "sanctioned": bool(a.vessel.sanctions), "history_days": v["historyDays"],
+            "engine": engine}
 
 
 # ---------------------------------------------------------------- one plain line per finding, for the timeline
@@ -320,12 +322,28 @@ def story(f: Flag, a: Analysis, ref=None) -> dict[str, str]:
         stay = f"{days:.1f} days" if days >= 1 else f"{round(dur_h)} hours"
         return {"title": f"{verb} {m.get('port') or 'a port'}", "text": f"{_cap(m.get('zone') or 'A sensitive zone')}, a sanctioned area. {stay} {'at anchor' if m.get('anchorage') else 'alongside'}."}
     if f.rule == "Possible ship-to-ship transfer":
-        return {"title": f"Stopped beside {m.get('partner') or 'another ship'}",
-                "text": f"{hours_text(m.get('hours') or dur_h)} at sea, {_place(ref, f.lon, f.lat, region, 150)}, both under 1 knot. A possible ship-to-ship transfer."}
+        where = _place(ref, f.lon, f.lat, region, 150)
+        if m.get("alongside"):
+            text = f"{hours_text(m.get('hours') or dur_h)} alongside, {where}, outside port limits. A possible ship-to-ship transfer."
+        else:
+            text = f"{hours_text(m.get('hours') or dur_h)} at sea, {where}, both under 1 knot. A possible ship-to-ship transfer."
+        return {"title": f"Stopped beside {m.get('partner') or 'another ship'}", "text": text}
     if f.rule == "Draught change at sea":
         d = m.get("delta") or 0
+        moved = f"{m.get('from')} m to {m.get('to')} m"
+        where = _place(ref, f.lon, f.lat, region, 150)
+        cause = m.get("cause")
+        if cause == "underway":
+            after = f" after leaving {m['port']}" if m.get("port") else ""
+            return {"title": "Draught entered late",
+                    "text": f"{moved}, typed in while under way{after}, {where}. Cargo can't move while a ship is under way, so it doesn't count."}
+        if cause == "unheard":
+            return {"title": "Draught changed out of range",
+                    "text": f"{moved} after {hours_text(m.get('hours') or 0)} outside our receivers' coverage, where a port call may not have been heard. It doesn't count."}
+        why = (f" after stopping {hours_text(m.get('hours') or 0)} at sea" if cause == "stop" else
+               f" after {hours_text(m.get('hours') or 0)} with AIS off" if cause == "dark" else "")
         return {"title": f"Draught {'fell' if d < 0 else 'rose'} {abs(d):.1f} m at sea",
-                "text": f"{m.get('from')} m to {m.get('to')} m with no port call between, {_place(ref, f.lon, f.lat, region, 150)}. An indicator, not proof."}
+                "text": f"{moved}{why} with no port call between, {where}. An indicator, not proof."}
     if f.rule == "Position jump":
         jam = m.get("jamming")
         return {"title": f"Position jumped at {m.get('kn')} knots",

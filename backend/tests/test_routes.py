@@ -109,8 +109,11 @@ def test_rules_overrides_are_checked_and_persisted():
     assert call("PUT", "/api/admin/rules", {"overrides": {"ais_gap": {"min_hours": "8"}}}, cookie=owner)[0] == 400
     assert call("PUT", "/api/admin/rules", {"overrides": {"nope": {"x": 1}}}, cookie=owner)[0] == 400
     assert call("PUT", "/api/admin/rules", {"overrides": {"sanctions": {"lists": 1}}}, cookie=owner)[0] == 400
-    s, r, _ = call("PUT", "/api/admin/rules", {"overrides": {"ais_gap": {"min_hours": 8}}}, cookie=owner)
-    assert s == 200 and r["rules"]["ais_gap"]["min_hours"] == 8 and settings_store.rule_overrides() == {"ais_gap": {"min_hours": 8}}
+    assert call("PUT", "/api/admin/rules", {"overrides": {"sts": {"partner_needs_imo": 1}}}, cookie=owner)[0] == 400   # a switch takes on/off
+    assert call("PUT", "/api/admin/rules", {"overrides": {"sts": {"min_hours": True}}}, cookie=owner)[0] == 400        # a number takes a number
+    s, r, _ = call("PUT", "/api/admin/rules", {"overrides": {"ais_gap": {"min_hours": 8}, "sts": {"partner_needs_imo": False}}}, cookie=owner)
+    assert s == 200 and r["rules"]["ais_gap"]["min_hours"] == 8 and r["rules"]["sts"]["partner_needs_imo"] is False
+    assert settings_store.rule_overrides() == {"ais_gap": {"min_hours": 8}, "sts": {"partner_needs_imo": False}}
     s, r, _ = call("DELETE", "/api/admin/rules", cookie=owner)
     assert r["overrides"] == {} and settings_store.rule_overrides() == {}
 

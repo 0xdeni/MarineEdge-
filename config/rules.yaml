@@ -18,11 +18,18 @@ ais_gap:
 
 draught_change:
   min_meters: 1.0            # reported draught moves by at least this much with no port call between
+                             # (a draught of 0 means "not known" in AIS and never counts as a value)
+  after_stop_or_dark_only: true  # count it only when the ship stopped at sea (the sts speed and hours below) or
+                             # went dark since its last port call; a change typed in while under way all along is
+                             # that call's cargo entered late, and is shown as Info
 
 sts:
   max_dist_m: 500            # another vessel within this distance
+  alongside_max_dist_m: 150  # ...but when this ship is at anchor or moored, the other must be alongside: this close
+                             # (ships anchored apart are rarely nearer than 300 m; in a busy anchorage 500 m is just a neighbour)
   max_speed_kn: 1.0          # both slower than this
   min_hours: 2               # for at least this long, outside port limits
+  partner_needs_imo: true    # ignore partners that broadcast no IMO number (tugs, pilot boats, harbour craft)
   max_lookups_per_vessel: 12 # cap on paid 'vessels near' queries per vessel per run (each one costs credits)
 
 position_jump:

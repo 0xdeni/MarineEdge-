@@ -45,7 +45,7 @@ backend/app/jobs.py     refresh (watchlist → alerts → push), sweep, sanction
 backend/app/sanctions   OFAC SDN, EU and UK list downloads → sanctions table
 backend/app/reports     Jinja2 report → Playwright PDF
 backend/app/maps.py     admin-started download of the OpenStreetMap extract (Protomaps)
-backend/migrations      001…006, append-only
+backend/migrations      001…007, append-only
 backend/tests           synth.py (synthetic tracks) + test_*.py
 frontend/public         plain HTML/JS, no build: js/ui.js, api.js, map.js, pmtiles.js, onboarding.js, screens.js, profile.js, app.js; css/app.css; sw.js
 config/                 rules.yaml, zones.geojson, ports.csv, areas.json
@@ -57,7 +57,7 @@ docs/                   BRIEF, STATUS, PRODUCT, METHODOLOGY, API, ARCHITECTURE, 
 
 ```bash
 make dev        # app + API on http://localhost:8080 with the demo fleet; first account's server admin password: dev-setup-code
-make test       # cd backend && pytest -q, or python3 -m tests.run without pytest (65 tests)
+make test       # cd backend && pytest -q, or python3 -m tests.run without pytest (73 tests)
 make lint       # ruff check app tests (config in backend/pyproject.toml)
 make demo       # a sample PDF from the demo fleet (needs Playwright's Chromium)
 node --check frontend/public/js/*.js          # syntax check the app (also run by CI)

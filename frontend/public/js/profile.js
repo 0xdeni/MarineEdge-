@@ -325,13 +325,17 @@ const Profile = {
     const F = [
       ['port_call', 'Port calls', [['min_hours', 'Stopped for at least', 'h'], ['max_speed_kn', 'Slower than', 'kn'], ['port_radius_nm', 'Within', 'nm of the berth']]],
       ['ais_gap', 'AIS gaps', [['min_hours', 'Longer than', 'h'], ['high_hours', 'High when longer than', 'h'], ['near_sensitive_nm', 'High when within', 'nm of a zone'], ['coverage_max_hours', 'Not counted outside coverage up to', 'h']]],
-      ['draught_change', 'Draught change at sea', [['min_meters', 'At least', 'm']]],
-      ['sts', 'Ship-to-ship stops', [['max_dist_m', 'Within', 'm'], ['max_speed_kn', 'Both slower than', 'kn'], ['min_hours', 'For at least', 'h']]],
+      ['draught_change', 'Draught change at sea', [['min_meters', 'At least', 'm'], ['after_stop_or_dark_only', 'Only after a stop at sea or AIS off', 'Changes typed in while under way show as Info']]],
+      ['sts', 'Ship-to-ship stops', [['max_dist_m', 'Within', 'm'], ['alongside_max_dist_m', 'At anchor or moored, within', 'm'], ['max_speed_kn', 'Both slower than', 'kn'], ['min_hours', 'For at least', 'h'],
+        ['partner_needs_imo', 'Only ships with an IMO number', 'Leaves out tugs, pilot boats and harbour craft']]],
       ['position_jump', 'Position jumps', [['max_implied_kn', 'Implied speed above', 'kn']]],
     ];
     const changed = Object.keys(over).length > 0;
-    pc.innerHTML = F.map(([g, name, keys]) => pgroup(keys.filter(([k]) => R[g] && R[g][k] != null).map(([k, label, unit]) => `<label class="row numrow"><span class="tx"><div class="t1">${label}</div></span>
-        <input class="num ${over[g] && over[g][k] != null ? 'changed' : ''}" type="number" inputmode="decimal" step="any" min="0" data-g="${g}" data-k="${k}" value="${R[g][k]}" aria-label="${esc(name + ': ' + label)}"><span class="unit">${unit}</span></label>`), { head: name })).join('')
+    const field = (g, name, [k, label, unit]) => typeof R[g][k] === 'boolean'
+      ? switchRow(label, unit, R[g][k], 'rule-switch', `data-g="${g}" data-k="${k}"`)
+      : `<label class="row numrow"><span class="tx"><div class="t1">${label}</div></span>
+        <input class="num ${over[g] && over[g][k] != null ? 'changed' : ''}" type="number" inputmode="decimal" step="any" min="0" data-g="${g}" data-k="${k}" value="${R[g][k]}" aria-label="${esc(name + ': ' + label)}"><span class="unit">${unit}</span></label>`;
+    pc.innerHTML = F.map(([g, name, keys]) => pgroup(keys.filter(([k]) => R[g] && R[g][k] != null).map(f => field(g, name, f)), { head: name })).join('')
       + `<div style="padding:22px var(--edge) 0;display:grid;gap:10px"><button class="btn" data-act="save-rules"><span class="lbl">Save and re-check</span></button>${changed ? '<button class="btn secondary" data-act="reset-rules">Back to the defaults</button>' : ''}</div>
       <p class="sec-foot">Changes apply to every check from now on. Ships are re-checked the next time they're opened or swept.</p>`;
   },
@@ -542,6 +546,7 @@ const Profile = {
       case 'save-rules': return busy(el, async () => {
         const over = {}; let bad = null;
         $$('#pages input.num').forEach(i => { const v = parseFloat(i.value); if (!isFinite(v) || v < 0) { bad = i; return; } (over[i.dataset.g] = over[i.dataset.g] || {})[i.dataset.k] = v; });
+        $$('#pages [data-act="rule-switch"]').forEach(b => { (over[b.dataset.g] = over[b.dataset.g] || {})[b.dataset.k] = b.getAttribute('aria-checked') === 'true'; });
         if (bad) { bad.focus(); toast('Every value must be a number of zero or more.', 'err'); return; }
         try { const r = await API.saveRules(over); S.rules = r.rules; S.analyses.clear(); toast('Saved. Ships are re-checked with the new rules.', 'ok'); this.refresh(); } catch (e) { toast(e.message, 'err'); }
       });
@@ -551,6 +556,7 @@ const Profile = {
         try { const r = await API.resetRules(); S.rules = r.rules; S.analyses.clear(); toast('Default rules restored.', 'ok'); this.refresh(); } catch (e) { toast(e.message, 'err'); }
         return;
       }
+      case 'rule-switch': el.setAttribute('aria-checked', String(el.getAttribute('aria-checked') !== 'true')); return;   // saved with "Save and re-check"
       case 'zone': {
         const on = el.getAttribute('aria-checked') === 'true';
         el.setAttribute('aria-checked', String(!on));

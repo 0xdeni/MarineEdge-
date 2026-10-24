@@ -67,3 +67,42 @@ def test_alert_dedup_by_hour():
     assert not st.add_alert(9000036, "AIS gap", 1_000_000_800_000 + 20 * 60_000, "high", "AIS gap of 30 hours", "")   # same hour
     assert st.add_alert(9000036, "AIS gap", 1_000_000_800_000 + 2 * H, "high", "AIS gap of 31 hours", "")
     assert len(st.list_alerts(0)) == 2
+
+
+def test_zone_switches_override_the_shipped_defaults():
+    """config/zones.geojson ships Syria off and the rest on; an admin's switch in the app wins either way."""
+    import tempfile
+    from pathlib import Path
+
+    from app import settings_store
+    d = Path(tempfile.mkdtemp(prefix="me-test-"))
+    settings_store.DATA_DIR, settings_store.FILE = d, d / "settings.json"
+    svc = make_service()
+    z = svc.ref.zone_by_id
+    svc._apply_zone_settings()
+    assert not z["syria"].enabled and z["crimea"].enabled
+    settings_store.set_zone_enabled("syria", True)
+    settings_store.set_zone_enabled("crimea", False)
+    svc._apply_zone_settings()
+    assert z["syria"].enabled and not z["crimea"].enabled
+    settings_store.set_zone_enabled("syria", False)
+    svc._apply_zone_settings()
+    assert not z["syria"].enabled and settings_store.zones_on() == [] and "syria" in settings_store.zones_off()
+
+
+def test_verdicts_from_older_rules_count_as_not_checked():
+    """After a rule fix, stored verdicts from the old rules must not keep ships on the High-risk list: they read as
+    not checked until the background sweep (or opening the ship) checks them again."""
+    from app.engine import ENGINE_VERSION
+    svc = make_service()
+    svc.store.save_risk(9000013, {"name": "OLD", "level": "high", "high": 3, "engine": "2026-01-01:0"})
+    svc.store.save_risk(9000036, {"name": "OLDER", "level": "high", "high": 1})          # written before versions existed
+    assert svc.fresh_risk([9000013, 9000036]) == {}
+    svc.analysis(9000013, refresh=True)
+    fresh = svc.fresh_risk([9000013, 9000036])
+    assert list(fresh) == [9000013] and fresh[9000013]["engine"].startswith(ENGINE_VERSION + ":")
+    # switching a zone (or changing a threshold) in the app re-checks every ship too
+    svc.set_zone("crimea", False)
+    assert svc.fresh_risk([9000013]) == {}
+    svc.set_zone("crimea", True)
+    assert list(svc.fresh_risk([9000013])) == [9000013]

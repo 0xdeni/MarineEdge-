@@ -48,6 +48,7 @@ class Zone:
     poly: list[list[float]]   # [lon, lat] ring
     enabled: bool = True
     short: str = ""           # how a sentence names it: "Crimea", "Iranian waters"
+    default_on: bool = True   # the default from config/zones.geojson; an admin's switch in the app overrides it
 
 
 @dataclass

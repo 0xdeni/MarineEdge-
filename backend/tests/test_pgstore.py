@@ -165,8 +165,9 @@ def test_postgres_accounts_roundtrip():
         assert n["text"] == "edited" and n["scope"] == "voyage:3" and n["author"] == "Owner Two"
         st.delete_vessel_note(nid)
         assert st.get_vessel_note(nid) is None
-        st.save_risk(9900002, {"name": "TEST", "level": "high", "high": 2, "medium": 0, "info": 1, "headline": "h", "sentence": "s", "sanctioned": False, "history_days": 300.0})
-        assert st.get_risk([9900002])[9900002]["level"] == "high"
+        st.save_risk(9900002, {"name": "TEST", "level": "high", "high": 2, "medium": 0, "info": 1, "headline": "h", "sentence": "s", "sanctioned": False, "history_days": 300.0,
+                               "engine": "test-1"})
+        assert st.get_risk([9900002])[9900002]["level"] == "high" and st.get_risk([9900002])[9900002]["engine"] == "test-1"
         st.set_alerts_seen(owner_email, int(time.time() * 1000))
         assert st.get_alerts_seen(owner_email) > 0
         a.remove_member(u, s2.user["id"])

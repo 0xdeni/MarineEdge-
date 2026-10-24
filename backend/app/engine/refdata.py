@@ -78,7 +78,7 @@ def load_refdata(config_dir: str | os.PathLike | None = None) -> RefData:
             pr = ft["properties"]
             ring = ft["geometry"]["coordinates"][0]
             zones.append(Zone(id=pr["id"], name=pr["name"], basis=pr.get("basis", ""), poly=[list(p) for p in ring], enabled=pr.get("enabled", True),
-                              short=pr.get("short") or pr["name"]))
+                              short=pr.get("short") or pr["name"], default_on=pr.get("enabled", True)))
     jamming, sts_areas = [], []
     ap = d / "areas.json"
     if ap.exists():
