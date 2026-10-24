@@ -1,7 +1,7 @@
 """Detailed base map, hosted on this server: an extract of the Protomaps OpenStreetMap basemap for the regions
 MarineEdge records (Black Sea to the Eastern Mediterranean; the Gulf, Hormuz, Oman and the Arabian Sea).
 
-An admin starts the download in the app (Profile › Maps). It runs once, in the background:
+An admin starts the download in the app (Profile › Detailed maps). It runs once, in the background:
   1. fetch the `pmtiles` command-line tool (go-pmtiles, pinned version, SHA-256 checked) for this CPU
   2. find the newest daily build at build.protomaps.com
   3. `pmtiles extract` only the two regions, up to the chosen zoom, into the data volume

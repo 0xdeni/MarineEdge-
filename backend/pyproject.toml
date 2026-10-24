@@ -26,5 +26,7 @@ line-length = 160
 target-version = "py311"
 
 [tool.ruff.lint]
-# the codebase's compact style: small lambdas, short loop names, several argparse calls per line
+# Pinned to ruff's classic default rules (pyflakes + the E4/E7/E9 checks) so `make lint` means the same with any
+# ruff version. The codebase's compact style: small lambdas, short loop names, several argparse calls per line.
+select = ["E4", "E7", "E9", "F"]
 ignore = ["E731", "E741", "E702"]

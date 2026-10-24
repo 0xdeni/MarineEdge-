@@ -111,7 +111,7 @@
 
 <h2>Identity and sanctions</h2>
 <table class="kv">
-  <tr><th>Sanctions</th><td>{% if sanc.listed %}<span class="red">Listed</span> · {% for s in sanc.listed %}{{ s.list }}{% if s.programme %} ({{ s.programme }}){% endif %}{% if s.t %} since {{ s.t }}{% endif %}{% if not loop.last %}; {% endif %}{% endfor %}{% elif sanc.lists %}Not listed <span class="s">· checked against {{ sanc.lists }}{% if sanc.checked %}, lists downloaded {{ sanc.checked }}{% endif %}</span>{% else %}<span class="s">Not checked: the server hasn't downloaded the sanctions lists yet</span>{% endif %}</td></tr>
+  <tr><th>Sanctions</th><td>{% if sanc.listed %}<span class="red">Listed</span> · {% for s in sanc.listed %}{{ s.list }}{% if s.programme %} ({{ s.programme }}){% endif %}{% if s.t %}, on the list since at least {{ s.t }}{% endif %}{% if not loop.last %}; {% endif %}{% endfor %}{% elif sanc.lists %}Not listed <span class="s">· checked against {{ sanc.lists }}{% if sanc.checked %}, lists downloaded {{ sanc.checked }}{% endif %}</span>{% else %}<span class="s">Not checked: the server hasn't downloaded the sanctions lists yet</span>{% endif %}</td></tr>
   <tr><th>Name</th><td>{{ v.name }}{% if last.name %} <span class="s">· since {{ last.name.t|dy }}, before: {{ last.name['from'] }}</span>{% elif v.ex_names %} <span class="s">· formerly {{ v.ex_names|join(', ') }}</span>{% endif %}</td></tr>
   {% if v.flag %}<tr><th>Flag</th><td>{{ v.flag }}{% if last.flag %} <span class="s">· since {{ last.flag.t|dy }}, before: {{ last.flag['from'] }}</span>{% endif %}</td></tr>{% endif %}
   {% if v.mmsi %}<tr><th>MMSI</th><td>{{ v.mmsi }}{% if last.mmsi %} <span class="s">· since {{ last.mmsi.t|dy }}, before: {{ last.mmsi['from'] }}</span>{% endif %}</td></tr>{% endif %}

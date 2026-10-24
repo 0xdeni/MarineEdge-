@@ -1,7 +1,7 @@
 """Mock AIS provider: 40 fictional vessels with deterministic generated 12-month tracks that follow
 sea lanes between real ports, with planted events (gaps, draught changes, STS, jumps, sensitive calls)
-by risk profile. Same data as the browser prototype. No network, no credits. Used for dev, demos and
-the frontend's offline mode; swap for Datalastic/Kpler in .env."""
+by risk profile. No network, no credits. Used by the tests and the development server (`make dev`) only:
+a server refuses it unless VVT_ALLOW_MOCK=1 (settings_store.mock_allowed), so real users never see it."""
 from __future__ import annotations
 
 import heapq

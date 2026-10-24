@@ -7,7 +7,7 @@ No terminal is needed for any step. Items are in the order that unblocks the mos
 - [x] **A0. Repository public** (23 Oct) — a fresh server downloads the code without a token.
 - [x] **A1. Server running** on an AWS Free-plan trial since 24 Oct: `https://44-197-249-76.sslip.io`. Click path for a new one (AWS, Google Cloud, Oracle) in `docs/FREE-STACK.md` § Owner steps 4–6 and `docs/DEPLOY.md`.
 - [x] **A2. The setup file** with your admin password (`ADMIN_TOKEN=`) — keep that password in your password manager: it is the **server admin password** that creates the first account.
-- [ ] **A3. Your account (once, after the 1.0 update).** Open the address in Safari › **Get started** › swipe through the three pages › **Create account** › your name, email, a password of your own, and the server admin password › **Create owner account**. Then Share › **Add to Home Screen**, and open MarineEdge from the Home Screen from now on.
+- [ ] **A3. Your account (once; 1.0 is live since 24 Oct).** Open the address in Safari › **Get started** › swipe through the three pages › **Create account** › your name, email, a password of your own, and the server admin password › **Create owner account**. Then Share › **Add to Home Screen**, and open MarineEdge from the Home Screen from now on.
 - [ ] **A4. Before the trial ends** (6 months after the AWS sign-up): we move to the next server, or you upgrade the AWS account to paid (~$18/month). The move will be ready in the app well before then.
 
 ## B. Real ship data
@@ -33,7 +33,7 @@ No terminal is needed for any step. Items are in the order that unblocks the mos
 - [ ] **D3. Domain:** buy or pick a subdomain (tracker.yourcompany.com), add an A record to the server's IP, tell me; one setting change moves the server to it.
 - [x] **D4. UK sanctions list:** automatic since 1.0 (the FCDO list has a fixed address now). Profile › Sanctions lists shows the count per list after each daily download.
 - [ ] **D5. Backups off-site:** a bucket (Hetzner Object Storage, Backblaze B2 or S3); send me the access keys through your password manager, not chat. Nightly dumps already run on the server's own disk.
-- [ ] **D6. Zones:** confirm the five sensitive zones (Crimea, occupied Azov coast, Syria, Iran coastal waters, North Korea) or name others; you can switch each one on or off in Profile › Sensitive zones.
+- [ ] **D6. Zones:** confirm the five sensitive zones (Crimea, occupied Azov coast, Syria, Iran coastal waters, North Korea) or name others; you can switch each one on or off in Profile › Sensitive zones. **Syria first:** the US ended its Syria sanctions programme in 2025 and the EU and UK lifted most economic sanctions, so keep that zone only if your policy still treats Syria as high-risk (`docs/METHODOLOGY.md` has the details).
 - [ ] **D7. OpenSanctions** (optional aggregator): needs a commercial licence for business use; one email for a quote if you want it.
 
 ## Things I keep doing without you
