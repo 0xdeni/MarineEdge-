@@ -6,6 +6,8 @@ Links: repo https://github.com/0xdeni/MarineEdge- · approved redesign (round 2)
 
 ## Version 1.0 — the approved redesign, built (24 Oct)
 
+On branch `redesign-r2`, with a pull request into `main`; the server installs it within 10 minutes of the merge, behind its usual gate.
+
 Everything on screen now comes from the server; the app has no demo data of its own any more, and a server refuses the generated demo fleet (only a development machine with `VVT_ALLOW_MOCK=1` shows it).
 
 - **Welcome, logo, intro.** A new mark (a ship's track drawn as an M, ending at its position now), animated on first open; three intro pages (voyages on one map, red flags with evidence, watch and hear first) over the app's own night chart. Reduce Motion turns all of it into fades.
@@ -33,7 +35,7 @@ Everything on screen now comes from the server; the app has no demo data of its 
 
 ## Needs the owner (all from the iPhone)
 
-1. Sign in the new way: Get started › Create account, with the admin password as the server admin password (the old token-style sign-in still works once and turns into the owner account).
+1. Once 1.0 is merged into `main` (the server installs it within 10 minutes): Get started › Create account, with the admin password as the server admin password. Signing in the old way (your email and the admin password) also works once and becomes the owner account; notes from the old sign-in carry over.
 2. Paste the free aisstream.io key on the map screen. Recording starts within a minute; Profile › Data sources shows whether aisstream accepts it.
 3. Optional now: Datalastic key (12 months per ship), GFW token, email settings, detailed maps download.
 

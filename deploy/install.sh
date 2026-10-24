@@ -136,7 +136,7 @@ VVT_REPORT_DIR=/data/reports
 VVT_DATA_DIR=/data
 PUSH_MIN_SEVERITY=high
 UK_SANCTIONS_CSV_URL=
-# AIS keys are normally pasted in the app (Profile › AIS provider); these are only fallbacks.
+# AIS keys are normally pasted in the app (map screen or Profile › Data sources); these are only fallbacks.
 AISSTREAM_API_KEY=
 GFW_API_TOKEN=
 RCLONE_REMOTE=

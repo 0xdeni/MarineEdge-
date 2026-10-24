@@ -1,8 +1,8 @@
 # Deploy — one paste, no terminal
 
 MarineEdge installs itself on a fresh Ubuntu 24.04 server from a cloud-init file. The whole setup can be
-done from a phone in the hosting provider's app or website. After that, every setting (AIS provider key,
-rules, zones, watchlist, push) is changed inside the app.
+done from a phone in the hosting provider's app or website. After that, everything (your account and the team, data-source
+keys, email, rules, zones, watchlist, push) is done inside the app.
 
 ## 1. Create the server (5 minutes)
 
@@ -11,7 +11,7 @@ Hetzner Cloud (recommended, ~€4–8/month), DigitalOcean, Vultr or Scaleway al
 1. Open `deploy/cloud-init.yaml` on GitHub, tap Raw, select all, copy.
 2. In the provider's "create server" screen pick **Ubuntu 24.04**, the smallest 2 vCPU / 4 GB size, any EU location.
 3. Find the **cloud-init / user data** field, paste the file, and edit the lines inside it:
-   - `ADMIN_TOKEN=` → a long passphrase of your choice (this is your sign-in password)
+   - `ADMIN_TOKEN=` → a long passphrase of your choice: the server admin password, which creates your owner account once (keep it in your password manager)
    - `DOMAIN=` → leave empty for now (you get `https://<ip>.sslip.io` with a real certificate), or your own domain once its A record points at the server
    - `GITHUB_TOKEN=` → only while the repository is private: a fine-grained personal access token for this one repository with Contents: Read-only. A public repository needs nothing here.
 4. Create the server. Note its IPv4 address.

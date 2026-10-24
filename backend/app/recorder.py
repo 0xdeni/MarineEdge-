@@ -2,7 +2,7 @@
 and writes position reports and static data into the store. Runs as its own container
 (`recorder` in docker-compose) and restarts itself on any error.
 
-  python -m app.recorder            # needs an aisstream key: Profile › AIS provider in the app, or AISSTREAM_API_KEY
+  python -m app.recorder            # needs an aisstream key: the map screen or Profile › Data sources in the app, or AISSTREAM_API_KEY
 
 Volume policy (config/rules.yaml → live:) — a ship under way reports every 2–10 s, at anchor every 3 min;
 the engine needs far less (vendors sell hourly history), and small free servers have 30–40 GB disks:

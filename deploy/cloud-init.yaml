@@ -4,8 +4,9 @@
 #   Hetzner / DigitalOcean / Vultr › Cloud config / User data · Oracle › Initialization script.
 # Edit the values under "content:" first.
 #
-#   ADMIN_TOKEN   the password you will sign in with (long, no spaces). Leave empty to get a random one
-#                 written to /opt/marineedge/.env and /var/log/marineedge-install.log on the server.
+#   ADMIN_TOKEN   the server admin password (long, no spaces): it creates the first account, which becomes the
+#                 owner; keep it in a password manager. Leave empty to get a random one written to
+#                 /opt/marineedge/.env and /var/log/marineedge-install.log on the server.
 #   DOMAIN        tracker.yourcompany.com (A record → the server's IP), or leave empty to get
 #                 https://<ip>.sslip.io with a real certificate and no domain purchase.
 #   AUTO_UPDATE   1 = pull every new commit from GitHub within 10 minutes, test it on the server, deploy if green
@@ -13,8 +14,9 @@
 #                 repository with "Contents: Read-only" (github.com › Settings › Developer settings › Fine-grained
 #                 tokens). Leave empty when the repository is public.
 #
-# Five minutes after the server boots, open https://<DOMAIN> on the phone, sign in with any email and the
-# ADMIN_TOKEN, then Profile › AIS provider to paste the aisstream.io (free) or Datalastic key.
+# Five minutes after the server boots, open https://<DOMAIN> on the phone › Get started › Create account, with
+# the ADMIN_TOKEN as the server admin password. Then paste the free aisstream.io key on the map screen
+# (Datalastic and the rest: Profile › Data sources). Everyone else joins by invite from Profile › Team.
 write_files:
   - path: /opt/marineedge-setup.env
     permissions: "0600"
@@ -23,7 +25,7 @@ write_files:
       DOMAIN=
       AUTO_UPDATE=1
       GITHUB_TOKEN=
-      PROVIDER=mock
+      PROVIDER=aisstream
       DATALASTIC_API_KEY=
   - path: /opt/marineedge-bootstrap.sh
     permissions: "0700"
