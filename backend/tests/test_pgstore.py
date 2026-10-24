@@ -45,7 +45,7 @@ def test_postgres_store_roundtrip():
     st.live_put(rows[:3])                                                 # ON CONFLICT DO NOTHING
     st.live_backfill_imo(mmsi, imo)
     tr = st.live_track(imo, now - 3_600_000, now)
-    assert len(tr) == 10 and tr[0]["imo"] == imo and tr[0]["draught"] == 11.2 and tr[-1]["t"] > tr[0]["t"]
+    assert len(tr) == 10 and tr[0]["imo"] == imo and abs(tr[0]["draught"] - 11.2) < 1e-4 and tr[-1]["t"] > tr[0]["t"]   # REAL column
     assert st.live_last(imo)["t"] == rows[-1]["t"]
     latest = st.live_latest((28.0, 40.0, 30.0, 42.0))
     me = [r for r in latest if r["mmsi"] == mmsi]
