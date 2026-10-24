@@ -89,7 +89,7 @@ def prune_live(full: bool = False) -> dict:
     from app.store import make_store
     live = load_rules().get("live", {}) or {}
     store = make_store()
-    return store.live_prune(int(live.get("full_res_days", 30)), int(live.get("thin_minutes", 15)), int(live.get("retention_months", 14)), window_days=None if full else 3)
+    return store.live_prune(int(live.get("full_res_days", 30)), int(live.get("thin_minutes", 30)), int(live.get("retention_months", 14)), window_days=None if full else 3)
 
 
 def main(argv: list[str]) -> int:

@@ -131,29 +131,67 @@ def test_gfw_event_normalisation():
     assert normalise_event({})["label"] == "event"
 
 
+def _pos(mmsi, sec, sog, cog, nav=0, base=None):
+    """A PositionReport `sec` seconds after 2026-10-20 11:46:52Z with the given speed, course and nav status."""
+    from datetime import datetime, timedelta, timezone
+    base = base or datetime(2026, 10, 20, 11, 46, 52, tzinfo=timezone.utc)
+    p = {**POS["Message"]["PositionReport"], "UserID": mmsi, "Sog": sog, "Cog": cog, "NavigationalStatus": nav}
+    return {**POS, "MetaData": {**POS["MetaData"], "MMSI": mmsi, "time_utc": (base + timedelta(seconds=sec)).strftime("%Y-%m-%d %H:%M:%S") + " +0000 UTC"},
+            "Message": {"PositionReport": p}}
+
+
 def test_recorder_volume_policy():
-    """One fix per ship per min_interval_s; ships outside keep_types dropped once their type is known;
-    every received fix still counts for coverage."""
+    """Significance sampling: one fix per 10 min under way and per 30 min stopped, plus turns and starts/stops,
+    never closer than 60 s; anchor swing does not flap; non-cargo types dropped once known; coverage counts all."""
     from app.engine.rules_config import Rules
     st = MemoryStore()
-    rec = Recorder(st, rules=Rules({"live": {"min_interval_s": 120, "keep_types": ["70-89"]}}))
+    rec = Recorder(st, rules=Rules({"live": {"keep_types": ["70-89"]}}))       # every other threshold from the defaults
     assert rec.keeps(None) and rec.keeps(80) and rec.keeps(70) and not rec.keeps(30) and not rec.keeps(60)
-    from datetime import datetime, timedelta, timezone
-    base = datetime(2026, 10, 20, 11, 46, 52, tzinfo=timezone.utc)
-    for sec in (0, 30, 90, 125, 200, 250):                     # 6 reports in 250 s → 3 stored (0, 125, 250)
-        rec.handle({**POS, "MetaData": {**POS["MetaData"], "time_utc": (base + timedelta(seconds=sec)).strftime("%Y-%m-%d %H:%M:%S") + " +0000 UTC"}})
-    assert rec.counts["received"] == 6 and rec.counts["stored"] == 3 and rec.counts["sampled_out"] == 3
+    m = 271044144
+    for sec in range(0, 1801, 10):                       # 30 min under way on a steady course, a report every 10 s
+        rec.handle(_pos(m, sec, 12.0, 90.0))
+    assert rec.counts["received"] == 181 and rec.counts["stored"] == 4          # 0, 600, 1200, 1800 s
+    rec.handle(_pos(m, 1830, 12.0, 130.0))               # 40° turn, but only 30 s after the last stored fix
+    assert rec.counts["stored"] == 4
+    rec.handle(_pos(m, 1860, 12.0, 130.0))               # 60 s after: the turn is stored
+    assert rec.counts["stored"] == 5
+    rec.handle(_pos(m, 1900, 0.2, 130.0, nav=1))         # dropped anchor: too soon (40 s)...
+    rec.handle(_pos(m, 1920, 0.2, 130.0, nav=1))         # ...60 s after the turn: the stop is stored
+    assert rec.counts["stored"] == 6
+    for k, sec in enumerate(range(2100, 2100 + 3600, 180)):   # an hour at anchor, swinging 0.2–1.4 kn, every 3 min
+        rec.handle(_pos(m, sec, 0.2 + 0.6 * (k % 3), (k * 47) % 360, nav=1))
+    assert rec.counts["stored"] == 8                      # one per 30 min: 3720 and 5520 s; the swing never reads as a departure
+    rec.handle(_pos(m, 5760, 9.0, 300.0, nav=0))          # heaves anchor and leaves: state change, stored at once
+    assert rec.counts["stored"] == 9
+    stored = rec.counts["stored"]
     # a ferry (type 60) announces itself: from now on its positions are filtered, coverage still counted
     ferry_static = {**STATIC, "MetaData": {**STATIC["MetaData"], "MMSI": 271000001}, "Message": {"ShipStaticData": {**STATIC["Message"]["ShipStaticData"], "UserID": 271000001, "ImoNumber": 9200002, "Type": 60}}}
     rec.handle(ferry_static)
-    rec.handle({**POS, "MetaData": {**POS["MetaData"], "MMSI": 271000001, "time_utc": "2026-10-20 12:00:00 +0000 UTC"}})
-    assert rec.counts["filtered"] == 1 and rec.counts["stored"] == 3 and rec.counts["received"] == 7
+    rec.handle(_pos(271000001, 600, 15.0, 10.0))
+    assert rec.counts["filtered"] == 1 and rec.counts["stored"] == stored
+    received = rec.counts["received"]
     rec.flush()
-    assert st.live_stats()["positions"] == 3
-    assert sum(st.live_coverage(days=36500).values()) == 7
+    assert st.live_stats()["positions"] == stored
+    assert sum(st.live_coverage(days=36500).values()) == received
     # unknown message types are counted, never raise
     rec.handle({"MessageType": "BaseStationReport", "MetaData": {"MMSI": 2}, "Message": {}})
     assert rec.counts["unparsed"] == 1
+
+
+def test_recorder_disk_guard():
+    """Below min_free_gb free, positions pause (counted), coverage continues; storing resumes when space is back."""
+    st = MemoryStore()
+    rec = Recorder(st, rules=RULES)
+    rec.min_free_gb = 1e9                                 # no disk is that big: guard trips
+    assert rec.check_disk() is True
+    rec.handle(_pos(271044144, 0, 12.0, 90.0))
+    assert rec.counts["paused_disk"] == 1 and rec.counts["stored"] == 0 and not rec.buf
+    rec.flush()
+    assert sum(st.live_coverage(days=36500).values()) == 1
+    rec.min_free_gb = 0.0
+    assert rec.check_disk() is False
+    rec.handle(_pos(271044144, 700, 12.0, 90.0))
+    assert rec.counts["stored"] == 1
 
 
 def test_live_prune_tiers():

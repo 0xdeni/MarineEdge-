@@ -37,6 +37,7 @@ class Store(Protocol):
     def live_coverage(self, days: int = 30) -> dict[tuple[int, int], int]: ...
     def live_prune(self, full_res_days: int, thin_minutes: int, retention_months: int, window_days: int = 3) -> dict: ...
     def live_stats(self) -> dict: ...
+    def db_size(self) -> Optional[int]: ...                                     # bytes; None when not a database
     def mmsi_upsert(self, row: dict) -> None: ...
     def mmsi_by_imo(self, imo: int) -> list[dict]: ...
     def mmsi_all(self) -> list[dict]: ...
@@ -207,6 +208,9 @@ class MemoryStore:
         ts = [t for p in self.live.values() for t in p]
         return {"positions": n, "mmsi": len(self.mmsi) or len(self.live), "with_imo": sum(1 for m in self.mmsi.values() if m.get("imo")), "oldest": min(ts) if ts else None, "newest": max(ts) if ts else None}
 
+    def db_size(self):
+        return None
+
     def mmsi_upsert(self, row):
         self.mmsi[row["mmsi"]] = {**self.mmsi.get(row["mmsi"], {}), **row}
 
@@ -369,9 +373,9 @@ class PostgresStore:
     def live_put(self, rows):
         with self._conn() as c:
             with c.cursor() as cur:
-                cur.executemany("INSERT INTO ais_live (mmsi, ts, geom, lat, lon, sog, cog, heading, nav, draught, imo) "
-                                "VALUES (%s, %s, ST_SetSRID(ST_MakePoint(%s, %s), 4326)::geography, %s, %s, %s, %s, %s, %s, %s, %s) ON CONFLICT DO NOTHING",
-                                [(r["mmsi"], self._ts(r["t"]), r["lon"], r["lat"], r["lat"], r["lon"], r.get("sog"), r.get("cog"), r.get("heading"), r.get("nav"), r.get("draught"), r.get("imo")) for r in rows])
+                cur.executemany("INSERT INTO ais_live (mmsi, ts, lat, lon, sog, cog, heading, nav, draught, imo) "
+                                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s) ON CONFLICT DO NOTHING",
+                                [(r["mmsi"], self._ts(r["t"]), r["lat"], r["lon"], r.get("sog"), r.get("cog"), r.get("heading"), r.get("nav"), r.get("draught"), r.get("imo")) for r in rows])
             c.commit()
 
     def live_backfill_imo(self, mmsi, imo):
@@ -402,12 +406,22 @@ class PostgresStore:
                                 ORDER BY a.mmsi, a.ts DESC""", (bbox[0], bbox[2], bbox[1], bbox[3])).fetchall()
         return [{**self._live_row(r[:10]), "name": r[10]} for r in rows]
 
+    LIVE_NEAR_SQL = """SELECT a.mmsi, COALESCE(a.imo, m.imo), m.name, min(a.ts), max(a.ts), avg(a.lat), avg(a.lon)
+        FROM ais_live a LEFT JOIN mmsi_map m ON m.mmsi = a.mmsi
+        WHERE a.ts BETWEEN %s AND %s
+          AND a.lat BETWEEN %s AND %s AND a.lon BETWEEN %s AND %s
+          AND 2 * 6371008.8 * asin(least(1, sqrt(power(sin(radians(a.lat - %s) / 2), 2)
+                + cos(radians(%s)) * cos(radians(a.lat)) * power(sin(radians(a.lon - %s) / 2), 2)))) <= %s
+        GROUP BY a.mmsi, COALESCE(a.imo, m.imo), m.name"""
+
     def live_near(self, lat, lon, radius_m, t0, t1):
+        """Ships within radius_m of a point during [t0, t1]: the primary key (ts, mmsi) narrows the time window,
+        a lat/lon box narrows the place, a great-circle distance decides. No PostGIS needed for the live table."""
+        import math
+        dlat = radius_m / 111_320.0
+        dlon = radius_m / (111_320.0 * max(0.01, math.cos(math.radians(lat))))
         with self._conn() as c:
-            rows = c.execute("""SELECT a.mmsi, COALESCE(a.imo, m.imo), m.name, min(a.ts), max(a.ts), avg(a.lat), avg(a.lon)
-                                FROM ais_live a LEFT JOIN mmsi_map m ON m.mmsi = a.mmsi
-                                WHERE a.ts BETWEEN %s AND %s AND ST_DWithin(a.geom, ST_SetSRID(ST_MakePoint(%s, %s), 4326)::geography, %s)
-                                GROUP BY a.mmsi, COALESCE(a.imo, m.imo), m.name""", (self._ts(t0), self._ts(t1), lon, lat, radius_m)).fetchall()
+            rows = c.execute(self.LIVE_NEAR_SQL, (self._ts(t0), self._ts(t1), lat - dlat, lat + dlat, lon - dlon, lon + dlon, lat, lat, lon, radius_m)).fetchall()
         return [{"mmsi": r[0], "imo": r[1], "name": r[2], "t0": int(r[3].timestamp() * 1000), "t1": int(r[4].timestamp() * 1000), "lat": r[5], "lon": r[6]} for r in rows]
 
     def live_search(self, q):
@@ -456,6 +470,10 @@ class PostgresStore:
         if n == 0 and newest is not None:   # before the first ANALYZE the estimate is 0 or -1: count exactly, capped at 1M rows
             n = self._count_small()
         return {"positions": n, "mmsi": n_mmsi, "with_imo": n_imo, "oldest": int(oldest.timestamp() * 1000) if oldest else None, "newest": int(newest.timestamp() * 1000) if newest else None, "estimate": True}
+
+    def db_size(self):
+        with self._conn() as c:
+            return int(c.execute("SELECT pg_database_size(current_database())").fetchone()[0])
 
     def _count_small(self):
         with self._conn() as c:

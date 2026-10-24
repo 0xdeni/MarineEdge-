@@ -4,6 +4,9 @@ services:
     # image has no arm64 build, so install.sh sets POSTGIS_IMAGE=imresamu/postgis:16-3.4-bookworm (same Debian
     # base and entrypoint, multi-arch) in .env. Never change this on a server that already has data.
     image: "${POSTGIS_IMAGE:-postgis/postgis:16-3.4}"
+    # cache sizes come from .env (install.sh sizes them to the machine's RAM); defaults suit a 1–2 GB box
+    command: ["postgres", "-c", "shared_buffers=${PG_SHARED_BUFFERS:-128MB}", "-c", "effective_cache_size=${PG_EFFECTIVE_CACHE:-512MB}"]
+    shm_size: 256mb
     environment: { POSTGRES_DB: vvt, POSTGRES_USER: vvt, POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-vvt}" }
     volumes: [ "pgdata:/var/lib/postgresql/data", "./backend/migrations:/docker-entrypoint-initdb.d:ro" ]
     restart: unless-stopped

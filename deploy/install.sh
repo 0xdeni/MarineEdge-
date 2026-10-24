@@ -68,11 +68,35 @@ if [ -z "$DOMAIN" ]; then
   DOMAIN="$(echo "$IP" | tr . -).sslip.io"
 fi
 
-# 4b. CPU architecture: Arm servers need the multi-arch PostGIS image (official image is amd64 only)
+# 4b. This machine: CPU architecture and memory decide a few settings (written to .env in step 5b)
+#     Arm (Oracle Always Free, Raspberry Pi): the official PostGIS image is amd64 only, use a multi-arch twin.
 case "$(uname -m)" in
   aarch64|arm64) POSTGIS_IMAGE="${POSTGIS_IMAGE:-imresamu/postgis:16-3.4-bookworm}"; echo "== arm64 detected: PostGIS image ${POSTGIS_IMAGE}" ;;
   *) POSTGIS_IMAGE="${POSTGIS_IMAGE:-postgis/postgis:16-3.4}" ;;
 esac
+#     Memory: 1–2 GB machines (Google e2-micro, Azure B1s, AWS t4g.small, Oracle AMD micro) get a swap file so
+#     image builds and PDF rendering fit, one API worker, and Postgres defaults; bigger ones give Postgres a
+#     quarter of the RAM for its cache (the standard rule), capped at 4 GB.
+MEM_MB=$(awk '/MemTotal/ {print int($2/1024)}' /proc/meminfo)
+if [ "$MEM_MB" -lt 3000 ] && [ -z "$(swapon --show --noheadings 2>/dev/null)" ]; then
+  FREE_GB=$(df --output=avail -BG / | tail -n 1 | tr -dc '0-9')
+  if [ "${FREE_GB:-0}" -ge 8 ]; then
+    if { fallocate -l 2G /swapfile 2>/dev/null || dd if=/dev/zero of=/swapfile bs=1M count=2048 status=none; } \
+       && chmod 600 /swapfile && mkswap /swapfile >/dev/null && swapon /swapfile; then
+      grep -q '^/swapfile ' /etc/fstab || echo '/swapfile none swap sw 0 0' >> /etc/fstab
+      echo "== ${MEM_MB} MB RAM: added a 2 GB swap file"
+    else
+      rm -f /swapfile; echo "== ${MEM_MB} MB RAM: could not add swap; continuing without it"
+    fi
+  fi
+fi
+if [ "$MEM_MB" -lt 2500 ]; then
+  API_WORKERS=1; PG_SHARED_BUFFERS=128MB; PG_EFFECTIVE_CACHE=512MB
+else
+  API_WORKERS=2; SB=$(( MEM_MB / 4 )); [ "$SB" -gt 4096 ] && SB=4096
+  PG_SHARED_BUFFERS="${SB}MB"; PG_EFFECTIVE_CACHE="$(( MEM_MB / 2 ))MB"
+fi
+echo "== ${MEM_MB} MB RAM: ${API_WORKERS} API worker(s), Postgres cache ${PG_SHARED_BUFFERS}"
 
 # 5. .env (created once; later runs keep it)
 if [ ! -f .env ]; then
@@ -102,6 +126,13 @@ EOF
   chmod 600 .env
   echo "== .env written. ADMIN TOKEN: ${ADMIN_TOKEN}  (also in ${DIR}/.env)"
 fi
+# 5b. Machine-dependent settings: added when missing or empty, also on re-runs (an existing value is kept,
+#     so a value set by hand wins).
+ensure_env() { grep -q "^$1=." .env || { sed -i "/^$1=/d" .env; echo "$1=$2" >> .env; }; }
+ensure_env POSTGIS_IMAGE "$POSTGIS_IMAGE"
+ensure_env API_WORKERS "$API_WORKERS"
+ensure_env PG_SHARED_BUFFERS "$PG_SHARED_BUFFERS"
+ensure_env PG_EFFECTIVE_CACHE "$PG_EFFECTIVE_CACHE"
 # shellcheck disable=SC1091
 set -a; . ./.env; set +a
 
@@ -142,4 +173,4 @@ else
   echo "== API not answering yet; check: docker compose logs api"
 fi
 echo "== MarineEdge is at https://${DOMAIN}  (certificate appears within a minute of DNS/IP being reachable)"
-echo "== Sign in with any email and the admin token. Then Profile › AIS provider to paste the Datalastic key."
+echo "== Sign in with any email and the admin token. Then Profile › AIS provider: aisstream.io (free) or Datalastic."

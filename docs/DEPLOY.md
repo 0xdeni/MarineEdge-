@@ -6,7 +6,7 @@ rules, zones, watchlist, push) is changed inside the app.
 
 ## 1. Create the server (5 minutes)
 
-Hetzner Cloud (recommended, ~€4–8/month), DigitalOcean, Vultr or Scaleway all take a cloud-init file. **Oracle Cloud Always Free** (€0, VM.Standard.A1.Flex 4 OCPU / 24 GB, Ubuntu 24.04) works with the same paste — put it under Advanced › Cloud-init, and afterwards add ingress rules for TCP 80 and 443 to the instance's VCN security list; the installer opens the same ports in the image's own firewall. See `docs/FREE-STACK.md` for the trade-offs.
+Hetzner Cloud (recommended, ~€4–8/month), DigitalOcean, Vultr or Scaleway all take a cloud-init file. **Oracle Cloud Always Free** (€0, VM.Standard.A1.Flex **2 OCPU / 12 GB** since June 2026, Ubuntu 24.04) works with the same paste — put it under Advanced › Cloud-init, and afterwards add ingress rules for TCP 80 and 443 to the instance's VCN security list; the installer opens the same ports in the image's own firewall. See `docs/FREE-STACK.md` for the trade-offs.
 
 1. Open `deploy/cloud-init.yaml` on GitHub, tap Raw, select all, copy.
 2. In the provider's "create server" screen pick **Ubuntu 24.04**, the smallest 2 vCPU / 4 GB size, any EU location.
@@ -20,7 +20,11 @@ Five minutes later: `https://<ip with dashes>.sslip.io` (example: IP 95.217.12.3
 
 The server pulls every new commit from GitHub within 10 minutes (`AUTO_UPDATE=1`), so fixes arrive without touching it. Set `AUTO_UPDATE=0` in the file later when you want releases to be deliberate.
 
-**The server is the CI.** `deploy/autoupdate.sh` does not blindly deploy: it builds the new image while the old one keeps serving, runs the full test suite inside the new image, and only then switches over, applies migrations and waits for `/api/health`. A failed build, a red test or an unhealthy API puts the previous commit back and the old containers stay up; that commit is not retried until a newer one lands. The verdict (commit, test summary, time, failure detail) is written to `state/update.json` and shown in the app under **Profile › AIS provider › Server updates** — green/red on the phone, no GitHub Actions needed.
+**The server is the CI.** `deploy/autoupdate.sh` does not blindly deploy: it builds the new image while the old one keeps serving, runs the full test suite inside the new image, and only then switches over, applies migrations and waits for `/api/health`. When the database is up it also applies the new migrations to a scratch database (`vvt_test`) and runs the PostGIS store test against it, so a broken migration or query never reaches the live data. A failed build, a failed migration, a red test or an unhealthy API puts the previous commit back and the old containers stay up; that commit is not retried until a newer one lands. The verdict (commit, test summary, time, failure detail) is written to `state/update.json` and shown in the app under **Profile › AIS provider › Server updates** — green/red on the phone, no GitHub Actions needed.
+
+**Free trials** take the same file: AWS EC2 › Launch instance › Advanced details › **User data** (Free plan, t4g.small, 30 GiB gp3, allow HTTP + HTTPS); Google Compute Engine › Advanced › Metadata › key **`user-data`** (allow HTTP + HTTPS). Click paths in `docs/FREE-STACK.md`.
+
+**Small machines (1–2 GB RAM)** are handled by the installer: it adds a 2 GB swap file, runs one API worker and keeps Postgres at its defaults; on bigger machines Postgres gets a quarter of the RAM as cache. Arm machines get the multi-arch PostGIS image. All of it is written to `.env` (`API_WORKERS`, `PG_SHARED_BUFFERS`, `PG_EFFECTIVE_CACHE`, `POSTGIS_IMAGE`); a value set by hand there wins.
 
 ## 2. Inside the app (phone)
 

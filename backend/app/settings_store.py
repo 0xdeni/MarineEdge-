@@ -90,3 +90,13 @@ def update_state() -> dict[str, Any] | None:
         return json.loads(p.read_text()) if p.exists() else None
     except Exception:  # noqa: BLE001
         return None
+
+
+def disk_view() -> dict[str, Any] | None:
+    """Free and total space on the data disk (the same disk as the database on a one-server install)."""
+    import shutil
+    try:
+        du = shutil.disk_usage(str(DATA_DIR) if Path(DATA_DIR).is_dir() else "/")
+    except OSError:
+        return None
+    return {"free_gb": round(du.free / 1e9, 1), "total_gb": round(du.total / 1e9, 1)}

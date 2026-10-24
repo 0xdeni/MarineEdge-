@@ -123,12 +123,17 @@ def me(request: Request):
 @app.get("/api/admin/config", dependencies=[Depends(require_admin)])
 def admin_config():
     from app import settings_store
-    live = None
+    live = db_bytes = None
     try:
         live = svc.store.live_stats()
     except Exception:  # noqa: BLE001  table missing until migration 003 runs
         live = None
-    return {**settings_store.public_view(), "active": getattr(svc.provider, "name", "?"), "credits_used": getattr(svc.provider, "credits_used", 0), "live": live, "update": settings_store.update_state(),
+    try:
+        db_bytes = svc.store.db_size()
+    except Exception:  # noqa: BLE001
+        db_bytes = None
+    return {**settings_store.public_view(), "active": getattr(svc.provider, "name", "?"), "credits_used": getattr(svc.provider, "credits_used", 0), "live": live, "update": settings_store.update_state(), "disk": settings_store.disk_view(),
+            "db_gb": round(db_bytes / 1e9, 2) if db_bytes else None,
             "fetches_this_run": svc.fetches, "rules": dict(svc.rules), "zones": [{"id": z.id, "name": z.name, "enabled": z.enabled} for z in svc.ref.zones],
             "database": bool(os.environ.get("DATABASE_URL")), "push": push.configured(), "auth": "token" if auth_enabled() else "open"}
 

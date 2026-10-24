@@ -37,8 +37,15 @@ history_months: 12           # how much track to fetch and analyse
 
 # Free live feed (aisstream.io) recording policy — read by the recorder and the prune job
 live:
-  min_interval_s: 120        # store at most one fix per ship per 2 minutes (the engine runs on hourly vendor data)
+  moving_interval_s: 600     # one stored fix per ship per 10 min while under way...
+  stationary_interval_s: 1800  # ...and per 30 min while at anchor or moored
+  min_interval_s: 60         # never two stored fixes closer than this
+  stationary_kn: 0.5         # a moving ship counts as stopped below this speed...
+  moving_kn: 2.0             # ...and a stopped ship as moving above this one (hysteresis: anchor swing is not a departure)
+  turn_deg: 25               # store an extra fix when the course changed this much since the last stored fix
+  turn_min_kn: 3.0           # (only above this speed; course over ground is noise when nearly stopped)
   keep_types: ["70-89"]      # AIS ship-type codes to record once known: 70–79 cargo, 80–89 tanker; unknown types are kept
   full_res_days: 30          # after this many days thin old rows to one fix per ship per thin_minutes
-  thin_minutes: 15
+  thin_minutes: 30
   retention_months: 14       # raw live rows older than this are deleted (analysis window is 12 months)
+  min_free_gb: 3             # stop storing positions while the data disk has less free space than this

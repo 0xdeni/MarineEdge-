@@ -22,7 +22,9 @@ DEFAULTS: dict[str, Any] = {
     "sanctions": {"lookback_months": 12, "lists": ["OFAC SDN", "EU", "UK"]},
     "history_months": 12,
     # free live feed (aisstream) recording policy; thresholds, not code
-    "live": {"min_interval_s": 120, "keep_types": ["70-89"], "full_res_days": 30, "thin_minutes": 15, "retention_months": 14},
+    "live": {"moving_interval_s": 600, "stationary_interval_s": 1800, "min_interval_s": 60, "stationary_kn": 0.5, "moving_kn": 2.0,
+             "turn_deg": 25, "turn_min_kn": 3.0, "keep_types": ["70-89"], "full_res_days": 30, "thin_minutes": 30,
+             "retention_months": 14, "min_free_gb": 3},
 }
 
 

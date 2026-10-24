@@ -4,15 +4,21 @@ and writes position reports and static data into the store. Runs as its own cont
 
   python -m app.recorder            # needs an aisstream key: Profile › AIS provider in the app, or AISSTREAM_API_KEY
 
-Volume policy (config/rules.yaml → live:) — the raw feed for both regions is 10–25 M messages a day, far more
-than a small server should keep, and far more than the engine needs (vendors sell hourly history):
-  * one stored fix per ship per `min_interval_s` (default 120 s);
+Volume policy (config/rules.yaml → live:) — a ship under way reports every 2–10 s, at anchor every 3 min;
+the engine needs far less (vendors sell hourly history), and small free servers have 30–40 GB disks:
+  * significance sampling: one stored fix per ship per `moving_interval_s` (10 min) while under way and per
+    `stationary_interval_s` (30 min) while stopped, plus a fix whenever the ship turns by `turn_deg` or
+    starts/stops (with hysteresis, so an anchored ship swinging on its chain does not count), never closer
+    than `min_interval_s` — about 4–5 stored fixes per ship-hour instead of hundreds received;
   * once a ship's static data says it is not a cargo ship or tanker (`keep_types`), its positions are dropped;
   * every received position still counts one fix in its 0.5° coverage cell, so the AIS-gap rule knows where
     receivers can hear even for ships we do not store;
+  * disk guard: below `min_free_gb` free on the data disk, positions stop being stored (coverage and static
+    data continue) until space is freed, so a full disk can never take the database down;
   * `python -m app.jobs prune-live` (daily cron) thins rows older than `full_res_days` to one per
     `thin_minutes` and deletes rows older than `retention_months`.
-Expected footprint after the policy: roughly 15 GB per year of PostGIS for both regions.
+Footprint with migration 004's slim rows (~130 bytes per fix with indexes): roughly 1 GB a month at full
+resolution and 0.5 GB a month once thinned for every 3,000 ships in receiver range — about 7–12 GB a year.
 
 Rules from aisstream's docs honoured here: first subscription within 3 s of connecting, read the socket
 continuously (we batch writes off the hot path), no browser connections, at most 3 connections per account."""
@@ -22,6 +28,7 @@ import asyncio
 import json
 import logging
 import os
+import shutil
 import signal
 import time
 
@@ -35,6 +42,13 @@ WS_URL = "wss://stream.aisstream.io/v0/stream"
 FLUSH_EVERY = 5.0          # seconds
 STATS_EVERY = 300.0
 KEY_CHECK_EVERY = 30.0     # a key pasted in the app is picked up within this
+DISK_CHECK_EVERY = 60.0
+NAV_STATES = {0, 1, 5}     # under way using engine, at anchor, moored: a change between these is a state change
+
+
+def angle_diff(a: float, b: float) -> float:
+    d = abs((a - b) % 360.0)
+    return 360.0 - d if d > 180.0 else d
 
 
 def current_key() -> str:
@@ -60,13 +74,23 @@ class Recorder:
         self.boxes = boxes or REGION_BOXES
         self.rules = rules or load_rules()
         live = self.rules.get("live", {}) or {}
-        self.min_interval_ms = int(live.get("min_interval_s", 120)) * 1000
+        self.min_interval_ms = int(live.get("min_interval_s", 60)) * 1000
+        self.moving_ms = int(live.get("moving_interval_s", 600)) * 1000
+        self.stationary_ms = int(live.get("stationary_interval_s", 1800)) * 1000
+        self.stationary_kn = float(live.get("stationary_kn", 0.5))
+        self.moving_kn = float(live.get("moving_kn", 2.0))
+        self.turn_deg = float(live.get("turn_deg", 25))
+        self.turn_min_kn = float(live.get("turn_min_kn", 3.0))
         self.keep = parse_type_ranges(live.get("keep_types", ["70-89"]))
+        self.min_free_gb = float(live.get("min_free_gb", 3))
+        self.disk_path = str(settings_store.DATA_DIR) if os.path.isdir(str(settings_store.DATA_DIR)) else "/"
+        self.disk_low = False
         self.static: dict[int, dict] = {}        # mmsi -> latest static row (imo, draught, type_code, …)
-        self.last_t: dict[int, int] = {}         # mmsi -> timestamp of the last stored fix
+        self.last: dict[int, dict] = {}          # mmsi -> {t, cog, moving, nav} of the last stored fix
         self.buf: list[dict] = []
         self.cov: dict[tuple[int, int, int], int] = {}
-        self.counts = {"received": 0, "stored": 0, "sampled_out": 0, "filtered": 0, "static": 0, "written": 0, "dropped": 0, "unparsed": 0}
+        self.counts = {"received": 0, "stored": 0, "sampled_out": 0, "filtered": 0, "static": 0, "written": 0, "dropped": 0,
+                       "unparsed": 0, "paused_disk": 0}
         self.stop = False
 
     def warm(self) -> None:
@@ -75,7 +99,42 @@ class Recorder:
         for r in self.store.mmsi_all():
             self.static[r["mmsi"]] = r
             n += 1
-        log.info("warm: %d MMSIs known · min interval %ds · keep types %s", n, self.min_interval_ms // 1000, self.keep or "all")
+        log.info("warm: %d MMSIs known · one fix per %ds under way / %ds stopped · keep types %s", n, self.moving_ms // 1000,
+                 self.stationary_ms // 1000, self.keep or "all")
+
+    def should_store(self, row: dict) -> bool:
+        """Significance sampling (see module doc). The state that matters is the one of the last STORED fix."""
+        m, t = row["mmsi"], row["t"]
+        sog, cog, nav = float(row.get("sog") or 0.0), float(row.get("cog") or 0.0), row.get("nav")
+        last = self.last.get(m)
+        if last is None:
+            self.last[m] = {"t": t, "cog": cog, "moving": sog >= self.moving_kn, "nav": nav}
+            return True
+        dt = t - last["t"]
+        if dt < self.min_interval_ms:
+            return False
+        moving = sog >= self.stationary_kn if last["moving"] else sog >= self.moving_kn     # hysteresis
+        due = dt >= (self.moving_ms if moving else self.stationary_ms)
+        state = moving != last["moving"] or (nav in NAV_STATES and last["nav"] in NAV_STATES and nav != last["nav"])
+        turned = moving and last["moving"] and sog >= self.turn_min_kn and angle_diff(cog, last["cog"]) >= self.turn_deg
+        if due or state or turned:
+            self.last[m] = {"t": t, "cog": cog, "moving": moving, "nav": nav}
+            return True
+        return False
+
+    def check_disk(self) -> bool:
+        """True while the data disk has less than min_free_gb free; storing positions pauses meanwhile."""
+        try:
+            free_gb = shutil.disk_usage(self.disk_path).free / 1e9
+        except OSError:
+            return self.disk_low
+        low = free_gb < self.min_free_gb
+        if low and not self.disk_low:
+            log.warning("disk nearly full (%.1f GB free < %.1f GB): positions paused, coverage and static data continue", free_gb, self.min_free_gb)
+        elif self.disk_low and not low:
+            log.info("disk space back (%.1f GB free): storing positions again", free_gb)
+        self.disk_low = low
+        return low
 
     def keeps(self, type_code) -> bool:
         if not self.keep or type_code is None:
@@ -105,11 +164,12 @@ class Recorder:
         if not self.keeps(st.get("type_code")):
             self.counts["filtered"] += 1
             return
-        last = self.last_t.get(row["mmsi"])
-        if last is not None and row["t"] - last < self.min_interval_ms:
+        if not self.should_store(row):
             self.counts["sampled_out"] += 1
             return
-        self.last_t[row["mmsi"]] = row["t"]
+        if self.disk_low:
+            self.counts["paused_disk"] += 1
+            return
         row["imo"] = st.get("imo")
         row["draught"] = st.get("draught")
         self.buf.append(row)
@@ -140,7 +200,8 @@ class Recorder:
         except Exception as e:  # noqa: BLE001  database not up yet at boot: start cold, the map fills from the feed
             log.warning("warm-up skipped (%s); static data will be learned from the feed", str(e)[:160])
         backoff = 2
-        last_flush = last_stats = last_key = time.time()
+        last_flush = last_stats = last_key = last_disk = time.time()
+        self.check_disk()
         while not self.stop:
             key = current_key()
             if not key:
@@ -165,6 +226,9 @@ class Recorder:
                         if now - last_stats >= STATS_EVERY:
                             log.info("stats %s", json.dumps(self.counts))
                             last_stats = now
+                        if now - last_disk >= DISK_CHECK_EVERY:
+                            last_disk = now
+                            self.check_disk()
                         if now - last_key >= KEY_CHECK_EVERY:
                             last_key = now
                             if key != current_key():

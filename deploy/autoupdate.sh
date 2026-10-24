@@ -10,6 +10,8 @@
 # /etc/cron.d/marineedge-update to stop auto-updating.
 set -uo pipefail
 cd "$(dirname "$0")/.."
+# shellcheck disable=SC1091
+[ -f .env ] && { set -a; . ./.env; set +a; }
 mkdir -p state
 STATE=state/update.json
 API_URL="${API_URL:-http://127.0.0.1:8000/api/health}"
@@ -39,8 +41,25 @@ if ! BUILD=$(docker compose build api 2>&1 | tail -n 30); then
   write_state "build_failed" "" "$BUILD"; git reset -q --hard "$LOCAL"; exit 0
 fi
 
-# 3. the test suite inside the new image, against the in-memory store
-TESTS=$(docker compose run --rm --no-deps -T -e DATABASE_URL= -e VVT_DATA_DIR=/tmp api python -m tests.run 2>&1 | tail -n 40)
+# 3. the test suite inside the new image. When the database is up, the new migrations are applied to a scratch
+#    database (vvt_test) and the PostGIS store test runs against it too; the live database is never touched.
+TEST_DB="-e DATABASE_URL="
+if docker compose exec -T db pg_isready -q -U vvt >/dev/null 2>&1; then
+  docker compose exec -T db psql -q -U vvt -d postgres -c "DROP DATABASE IF EXISTS vvt_test" -c "CREATE DATABASE vvt_test" >/dev/null 2>&1
+  MIG_ERR=""
+  for f in backend/migrations/*.sql; do
+    if ! OUT=$(docker compose exec -T db psql -q -v ON_ERROR_STOP=1 -U vvt -d vvt_test -f "/docker-entrypoint-initdb.d/$(basename "$f")" 2>&1); then
+      MIG_ERR="$(basename "$f"): $(echo "$OUT" | grep -m 3 -E 'ERROR|FATAL')"; break
+    fi
+  done
+  if [ -n "$MIG_ERR" ]; then
+    echo "$MIG_ERR"; echo "== migration failed on a scratch database, staying on $LOCAL"
+    write_state "migration_failed" "" "$MIG_ERR"; git reset -q --hard "$LOCAL"; exit 0
+  fi
+  TEST_DB="-e DATABASE_URL=postgresql://vvt:${POSTGRES_PASSWORD:-vvt}@db:5432/vvt_test"
+fi
+# shellcheck disable=SC2086
+TESTS=$(docker compose run --rm --no-deps -T $TEST_DB -e VVT_DATA_DIR=/tmp api python -m tests.run 2>&1 | tail -n 40)
 SUMMARY=$(echo "$TESTS" | grep -E '^[0-9]+ passed' | tail -n 1)
 if ! echo "$SUMMARY" | grep -qE 'passed, 0 failed'; then
   echo "$TESTS"; echo "== tests failed, staying on $LOCAL"

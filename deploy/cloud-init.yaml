@@ -1,6 +1,8 @@
 #cloud-config
-# MarineEdge · one-paste server setup for Ubuntu 24.04 (Hetzner, DigitalOcean, Vultr, Scaleway, Oracle Always Free:
-# paste as "cloud-init / user data" when creating the server). Edit the values under "content:" first.
+# MarineEdge · one-paste server setup for Ubuntu 24.04. Paste it where the provider takes cloud-init:
+#   AWS EC2 › Advanced details › User data · Google Compute Engine › Metadata › key "user-data" ·
+#   Hetzner / DigitalOcean / Vultr › Cloud config / User data · Oracle › Initialization script.
+# Edit the values under "content:" first.
 #
 #   ADMIN_TOKEN   the password you will sign in with (long, no spaces). Leave empty to get a random one
 #                 written to /opt/marineedge/.env and /var/log/marineedge-install.log on the server.
